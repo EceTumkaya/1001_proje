@@ -1,0 +1,267 @@
+---
+title: "Metalog Verisi Analizi"
+format: html
+editor: visual
+---
+
+Öncelikle tüm paketleri kapsayan `tidyverse` paketini tanımlayıp çağırıyoruz.
+
+```{r message=FALSE}
+library(tidyverse)
+```
+
+# Aşağıdaki linklerden Metalog verisetlerini indiriyoruz.
+
+[metalog human long dataset indir](https://metalog.embl.de/static/download/metadata/human_all_long_latest.tsv.gz)
+
+[metalog ocean long dataset indir](https://metalog.embl.de/static/download/metadata/ocean_all_long_latest.tsv.gz)
+
+[metalog environment long dataset indir](https://metalog.embl.de/static/download/metadata/environmental_all_long_latest.tsv.gz)
+
+
+
+Metalogdan indirdiğimiz verisetlerini okuyoruz. Buradaki kodların asıl amacı: R, bazı sayı değerlerini başka şeylere çevirmesin; hepsi aynı şekilde kalsın diye tüm verileri metin olarak okumamız.
+
+```{r}
+human <- read_tsv("human_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+
+ocean <- read_tsv("ocean_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+
+env <- read_tsv("environmental_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+
+```
+
+
+Veri setlerindeki `curation_tier` değeri `core` yani elzem olanları listelemeliyiz. Bunun nedeni: önemli sayılan `metadata_item` verileri, yüksek ihtimalle insan, okyanus ve çevre örneklerinde ortak olacaktır. Hem elzem başlıkları öğreneceğiz hem de hepsinde ortak olan `metadata_item`lerı çıkarmamız kolaylaşacak. Her veri seti için sadece `core` filtresi yaparsak:
+
+```{r}
+human_core <- human[human$curation_tier == "core", ]
+ocean_core <- ocean[ocean$curation_tier == "core", ]
+env_core <- env[env$curation_tier == "core", ]
+
+```
+
+
+Artık elimizde metadata_item değerleri yalnızca `core` olarak listelenmiş yeni veri setlerimiz var. Bu veride insana ait `r length(unique(human_core$metadata_item))` tane tekil veri bulunmakta.  Bazı metadata başlıkları tekrar ediyor. Tekrar eden başlıkları çıkarıp, 3 çeşit örnek için de ayrı ayrı başlıkları yazdıralım. Buradaki amacımız: başlıkları analiz edebilmek.
+
+```{r eval = FALSE}
+unique(human_core$metadata_item)
+unique(ocean_core$metadata_item)
+unique(env_core$metadata_item)
+```
+
+
+Şimdi de her listedeki ayrı başlıkları bir kesişime alarak hepsinde ortak olan `metadata_item` lari çıkaralım. Adı da `common_core` olsun.
+
+```{r}
+common_core <- Reduce(intersect, list(unique(human_core$metadata_item), unique(ocean_core$metadata_item), unique(env_core$metadata_item)))
+
+```
+
+
+Konsola `common_core` yazarak elde ettiğimiz sütun başlıklarına erişiriz.
+
+```{r eval = FALSE}
+common_core
+```
+
+
+Hepsinde yalnızca kendi grubunda bulunan, diğerlerinde bulunmayan metadata başlıklarını görmek istersek: (OPSİYONEL)
+
+```{r eval = FALSE}
+human_metadata <- unique(human_core$metadata_item)
+ocean_metadata <- unique(ocean_core$metadata_item)
+env_metadata <- unique(env_core$metadata_item)
+
+human_only_metadata <- setdiff(human_metadata, union(ocean_metadata, env_metadata))
+ocean_only_metadata <- setdiff(ocean_metadata, union(human_metadata, env_metadata))
+env_only_metadata   <- setdiff(env_metadata, union(human_metadata, ocean_metadata))
+
+```
+
+
+`human_only_metadata` ya da diğerlerini konsola yazdırarak diğerlerinde bulunmayan metadata item'lara ulaşırız.
+
+```{r eval = FALSE}
+human_only_metadata
+ocean_only_metadata
+env_only_metadata
+```
+
+
+Elimizde `common_core` adında, tüm veri setlerinde ortak olan metadataları içeren bir veri seti vardı. Şimdi: daha sonra birleştirebilmek için human, ocean ve env veri setlerinde sadece `common core` ile ortak olan değerleri içeren yeni listeler oluşturacağız. Bu sayede birleştirince çok fazla `NA` ile karşılaŞmayacağız. 
+
+```{r}
+human_core_filter <- human_core[human_core$metadata_item %in% common_core, ]
+ocean_core_filter <- ocean_core[ocean_core$metadata_item %in% common_core, ]
+env_core_filter <- env_core[env_core$metadata_item %in% common_core, ]
+
+```
+
+
+Artık birleştirme aşamasına geçebiliriz. Birleştiriken ilk olarak ekstra bir sütun eklemeliyiz. Bu sütun örneğin grubunu verecek ve ismi `domain_group` olsun. 
+
+```{r}
+human_core_filter$domain_group <- "human"
+ocean_core_filter$domain_group <- "ocean"
+env_core_filter$domain_group <- "env"
+
+```
+
+
+Burada birleştireceğimiz tablolarda hangi sütunları istediğimizi `keep_cols` adlı vektöre tanımladık. Daha sonra kullanacağız.
+
+```{r}
+keep_cols <- c("domain_group", "sample_alias", "metadata_item", "curation_tier", "value")
+```
+
+
+Veri çerçevelerini birleştirmemiz için önce aynı sütun sayısına ve isimlerine sahip olmalılar. For döngüsü oluşturarak 3 ayrı kod yazmak yerine hepsini tek bir döngüye alabiliriz. Eğer sütun isimleri yukarıda tanımladığımız `keep_cols` ile aynı değilse: o sütunları hepsine birden ekleyip NA koyarız ki aynı olsunlar. Alttaki komutlar ile  oluşan tüm yeni veri setlerinde sadece `keep cols` u almaya yarıyor.
+
+```{r}
+for (i in c("human_core_filter", "ocean_core_filter", "env_core_filter")) {
+  df <- get(i)
+  for (sutun in keep_cols) {
+    if(!sutun %in% names(df)) {  
+      df[[sutun]] <- NA}
+    }   
+  df <- df[ ,keep_cols]
+  assign(i, df)
+}
+```
+
+
+rbind komutuyla hepsini tek bir tabloda birleştirdik.
+
+```{r}
+master_long <- rbind(human_core_filter, ocean_core_filter, env_core_filter)
+```
+
+
+Alternatif yöntem:
+
+```{r}
+master_long_alternative <- rbind(human_core_filter[,keep_cols],
+                                 ocean_core_filter[,keep_cols],
+                                 env_core_filter[,keep_cols])
+```
+
+
+Satırlarda aynı bilgi birden fazla kez tekrarlanmış mı kontrol ediyoruz. sonuç 0 olmalı.
+
+```{r}
+dup_mask <- duplicated(master_long[, c("domain_group","sample_alias","metadata_item")])
+sum(dup_mask)
+```
+
+
+`İdvar`, `timevar` ve `v.names` komutları tablo oluştururken standarttır ancak oluşturacağımız tabloya göre sütun isimlerini biz belirleriz. Sırasıyla satır kimliği, geniş formdaki sütun isimlerini üreten alan ve yeni sütunlardaki hücrelerin değerinin hangi sütundan geleceğini belirten alan. Tabloyu geniş formata çevirdik.`  
+
+```{r}
+master_wide <- spread(data = master_long, key = "metadata_item", value = "value")
+
+```
+
+
+Oluşturduğumuz tabloyu kaydediyoruz.
+
+```{r}
+write.csv(master_wide, "master_common_core_wide.csv", row.names = FALSE)
+```
+
+
+Artık harita oluşturmaya başlayacağız. Hangi örneklerin hangi konumda olduğunu göreceğiz. Öncelikle paketleri yükleyip çağıralım.  
+
+```{r message=false}
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+
+```
+
+
+`sf` paketi içinden dünya haritasını alacağız. `ne_countries` ülke sınırlarını getirir. `scale` harita ayrıntısını ifaede eder ve `returnclass` haritayı `sf` formatında çağırmamızı sağlar.
+
+```{r}
+world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+```
+
+
+Aynı işlemi :: komutu kullanmadan da yapabiliriz. Bu komut `library` kullanmadan fonksiyonu o paketin içinden çağırmayı sağlar. Ancak biz `library` kullandığımızdan aşağıdaki kod daha kolay anlaşılır oluyor.
+
+```{r}
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+```
+
+
+Haritayı şu şekilde oluşturuyoruz: önce enlem ve boylamı numaraya çeviriyoruz. Sonra `sub` komutu ile metin içindeki desenler değişir: ,'ler .'lara çevrilir (R tarafından metin olarak algılanmasın diye). Enlem ve boylamlarımızda boşluklar varsa atılır. En sonunda ise tüm dünyayı kapsayıcı enlem ve boylamlarımızı gireriz.
+
+```{r}
+df_map <- master_wide
+df_map <- df_map |>
+  filter(!is.na(latitude), !is.na(longitude)) 
+
+```
+
+
+Renksiz bir harita için kodlarımız:
+
+```{r}
+p <- ggplot() +
+geom_sf(data = world, fill = "white", color = "grey50", linewidth = 0.4) +
+geom_point( data = df_map, aes(x = longitude, y = latitude, color = domain_group),
+alpha = 0.6, size = 1.0) +
+coord_sf(lims_method = "geometry_bbox", default_crs = NULL) +
+labs(x = "Longitude", y = "Latitude", color = "Domain") +
+theme_minimal()
+
+```
+
+
+Renklendirmek için gelişmiş: öncelikle temel bir harita çektik. Ardından `df_map` yani `master_wide` kullanarak kendi örneklerimizi nokta grafiğinde gösterdik. X ekseni enlem, y ekseni boylam oldu. Arka planı ise son kod ile mavi yapıp kenar çizgilerini kaldırdık.
+
+```{r}
+p <- ggplot() +
+  geom_sf(data = world, fill = "#cfead6", color = "grey60", linewidth = 0.25) + 
+  geom_point(data = df_map,
+             aes(x = longitude, y = latitude, color = domain_group),
+             shape = 16, size = 0.9, alpha = 0.35) +
+  coord_sf(lims_method = "geometry_bbox", default_crs = NULL) + 
+  labs(x = "Longitude", y = "Latitude", color = "Domain") + 
+  theme_minimal(base_size = 11) + 
+  theme(legend.position = "bottom", 
+        panel.background = element_rect(fill = "#d8eafd", color = NA))
+
+```
+
+
+Resim olarak kaydetmek için:
+
+```{r}
+ggsave("my_map.png", p, width = 12, height = 6.5, dpi = 300)
+```
+
+# Aşağıdaki linklerden Metaphlan 4 verisetlerini indiriyoruz.
+
+[human metaphlan 4 dataset indir](https://metalog.embl.de/static/download/profiles/human_metaphlan4_latest.tsv.gz)
+
+[ocean metaphlan 4 dataset indir](https://metalog.embl.de/static/download/profiles/ocean_metaphlan4_latest.tsv.gz)
+
+[environment metaphlan 4 dataset indir](https://metalog.embl.de/static/download/profiles/environmental_metaphlan4_latest.tsv.gz)
+
+
+
+Metalog veritabanından metaphlan 4 veri setlerini indirip R da okuyoruz.
+
+```{r}
+metaphlan4_human <- read_tsv("human_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+
+metaphlan4_ocean <- read_tsv("ocean_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+
+metaphlan4_env <- read_tsv("environmental_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+
+```
+
