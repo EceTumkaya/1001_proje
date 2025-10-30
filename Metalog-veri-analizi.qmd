@@ -18,7 +18,6 @@ library(tidyverse)
 
 [metalog environment long dataset indir](https://metalog.embl.de/static/download/metadata/environmental_all_long_latest.tsv.gz)
 
-kxdjfklsdjfslkdhksdg asdlkafg
 
 Metalogdan indirdiğimiz verisetlerini okuyoruz. Buradaki kodların asıl amacı: R, bazı sayı değerlerini başka şeylere çevirmesin; hepsi aynı şekilde kalsın diye tüm verileri metin olarak okumamız.
 
