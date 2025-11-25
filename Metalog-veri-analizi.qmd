@@ -19,6 +19,7 @@ library(tidyverse)
 [metalog environment long dataset indir](https://metalog.embl.de/static/download/metadata/environmental_all_long_latest.tsv.gz)
 
 
+
 Metalogdan indirdiğimiz verisetlerini okuyoruz. Buradaki kodların asıl amacı: R, bazı sayı değerlerini başka şeylere çevirmesin; hepsi aynı şekilde kalsın diye tüm verileri metin olarak okumamız.
 
 ```{r}
@@ -154,7 +155,7 @@ sum(dup_mask)
 ```
 
 
-`İdvar`, `timevar` ve `v.names` komutları tablo oluştururken standarttır ancak oluşturacağımız tabloya göre sütun isimlerini biz belirleriz. Sırasıyla satır kimliği, geniş formdaki sütun isimlerini üreten alan ve yeni sütunlardaki hücrelerin değerinin hangi sütundan geleceğini belirten alan. Tabloyu geniş formata çevirdik.`  
+`master_long` dosyasını, `master_wide` adı ile geniş formata çevirdik. `metadata_item` esas alınır.
 
 ```{r}
 master_wide <- spread(data = master_long, key = "metadata_item", value = "value")
@@ -243,17 +244,48 @@ Resim olarak kaydetmek için:
 ggsave("my_map.png", p, width = 12, height = 6.5, dpi = 300)
 ```
 
-# Aşağıdaki linklerden Metaphlan 4 verisetlerini indiriyoruz.
 
-[human metaphlan 4 dataset indir](https://metalog.embl.de/static/download/profiles/human_metaphlan4_latest.tsv.gz)
+Metaphlan 4 verisetleri indirmek için öncelikle internetten dosya indirme paketi olan `curl` 'ü çağırıyoruz. Ardından `dir.create` komutunu kullanarak dosyaları içine kaydedeceğimiz `data` adlı klasörü açıyoruz. Eğer klasör zaten bilgisayarda varsa işlem yapılmaz.
 
-[ocean metaphlan 4 dataset indir](https://metalog.embl.de/static/download/profiles/ocean_metaphlan4_latest.tsv.gz)
+```{r}
+library(curl)
 
-[environment metaphlan 4 dataset indir](https://metalog.embl.de/static/download/profiles/environmental_metaphlan4_latest.tsv.gz)
+dir.create("data", showWarnings = FALSE)
+```
 
 
+Metaphlan 4 verisetlerinin URL ve bilgisayardaki kaydedilmesini istediğimiz klasöre kaydedilmesi için `links` ve `files` tanımladık.
 
-Metalog veritabanından metaphlan 4 veri setlerini indirip R da okuyoruz.
+```{r}
+links <- c(
+  human = "https://metalog.embl.de/static/download/profiles/human_metaphlan4_latest.tsv.gz",
+  ocean = "https://metalog.embl.de/static/download/profiles/ocean_metaphlan4_latest.tsv.gz",
+  environment = "https://metalog.embl.de/static/download/profiles/environmental_metaphlan4_latest.tsv.gz")
+
+files <- c(
+  human = "data/human_metaphlan4_2025-10-26.tsv.gz",
+  ocean = "data/ocean_metaphlan4_2025-10-26.tsv.gz",
+  environment = "data/environmental_metaphlan4_2025-10-26.tsv.gz")
+```
+
+
+Metaphlan 4 verilerinin bilgisayarda yoksa indirilip, varsa bu işlemin atlanacağı bir for döngüsü oluşturuyotuz.
+
+```{r}
+for(k in names(links)) {
+  
+  if(!file.exists(files[k])) {
+    message("İndiriliyor: ", k)
+    curl_download(links[k], files[k])
+  }
+  else {
+    message("Zaten var, indirme atlandı: ", k)
+  }
+}
+```
+
+
+Metalog veritabanından indirdiğimiz metaphlan 4 verilerini R' da okuyoruz.
 
 ```{r}
 metaphlan4_human <- read_tsv("human_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
@@ -264,3 +296,11 @@ metaphlan4_env <- read_tsv("environmental_metaphlan4_2025-10-26.tsv.gz", col_typ
 
 ```
 
+
+Rastgele satır seçebilmek için bir fonksiyon oluşturabiliriz.`slice_sample` komutu rastgele satır için, n= ise kaç satır çağırmak istediğimizi belirtmek için kullanılır.
+
+```{r}
+pick_random_rows <- function(master_wide, n){
+  master_wide |> slice_sample(n=n)
+}
+```
