@@ -313,41 +313,40 @@ metaphlan_all <- rbind(metaphlan4_human, metaphlan4_ocean, metaphlan4_env)
 ```
 
 
-Metalog verilerinden seçilen rastegele örnekleri metaphlan verilerinden çekip, seçili örneklerle yeni bir tablo oluşturuyoruz. Tablomuzu önce data frame, sonra matrise dönüştürüyoruz. Yeni matriste Na yerine 0 koyuyoruz.
+Kullanılacak örnekleri `sample_ids` adıyla tanımlayıp `metaphlan_all` içinde var olanlarla ortak olanları alıyoruz. Seçili örneklerle yeni bir tablo oluşturuyoruz. Tablomuzu önce data frame, sonra matrise dönüştürüyoruz. Yeni matriste Na yerine 0 koyuyoruz.
 
 ```{r}
-make_metaphlan_species_matrix <- function(master_wide,
-                                          metaphlan_all,
-                                          n = 10,
-                                          seed = NULL) {
+make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
   
-  # 1) master_wide'dan n tane rastgele örnek seçelim.
-  if (!"sample_alias" %in% colnames(master_wide)) {
-    stop("master_wide içinde 'sample_alias' sütunu yok.")
-  }
-  if (n > nrow(master_wide)) {
-    stop("n, master_wide içindeki satır sayısından büyük olamaz.")
-  }
-  
-  idx <- sample(seq_len(nrow(master_wide)), size = n)   
-  random_ids <- master_wide$sample_alias[idx]          
-  
-  # 2) Metaphlan long tablosundan bu örnekleri çekelim. 
+  # 1) Gerekli sütunlar var mı kontrol edelim.
   needed_cols <- c("sample_alias", "clade_name", "rel_abund")
   missing <- setdiff(needed_cols, colnames(metaphlan_all))
   if (length(missing) > 0) {
-    stop(paste("metaphlan_all içinde eksik sütun(lar) var:",
-               paste(missing, collapse = ", ")))
+    stop(paste(
+      "metaphlan_all içinde eksik sütun(lar) var:",
+      paste(missing, collapse = ", ")
+    ))
   }
   
+  # 2) sample_ids gerçekten metaphlan_all içinde var mı kontrol edelim.
+  common_ids <- intersect(sample_ids, metaphlan_all$sample_alias)
+  if (length(common_ids) == 0) {
+    stop("Verdiğin sample_ids, metaphlan_all içinde bulunamadı.")
+  }
+  
+  if (length(common_ids) < length(sample_ids)) {
+    warning("Bazı sample_ids Metaphlan verisinde yok, sadece bulunanlar kullanılacak.")
+  }
+  
+  # 3) Metaphlan long tablosundan sadece bu örnekleri alalım.
   metaphlan_subset_long <- metaphlan_all[
-    metaphlan_all$sample_alias %in% random_ids,
+    metaphlan_all$sample_alias %in% common_ids,
     ,
     drop = FALSE
   ]
-  # metaphlan_subset_long: sadece seçilen örneklere ait long satırlar
+  # metaphlan_subset_long: seçilen örneklere ait long satırlar
   
-  # 3) Sadece species ('s__') düzeyini alıp önünden 's__''i kaldıralım. 
+  # 4) Sadece species ('s__') düzeyini alıp önünden 's__''i kaldıralım. 
   metaphlan_subset_long_species <- metaphlan_subset_long[
     grepl("s__", metaphlan_subset_long$clade_name),
     ,
@@ -367,7 +366,7 @@ make_metaphlan_species_matrix <- function(master_wide,
     metaphlan_subset_long_species$rel_abund
   )
   
-  # 4) Long → Wide çevirelim.
+  # 5) Long → Wide çevirelim.
   metaphlan_subset_wide_species <- spread(
     data  = metaphlan_subset_long_species,
     key   = "sample_alias",   
@@ -375,25 +374,25 @@ make_metaphlan_species_matrix <- function(master_wide,
   )
   # metaphlan_subset_wide_species: satırlar = türler, sütunlar = seçilen örnekler
   
-  # 5) Tibble ise klasik data.frame'e çevirelim. 
+  # 6) Tibble ise klasik data.frame'e çevirelim. 
   metaphlan_subset_wide_species <- as.data.frame(
     metaphlan_subset_wide_species,
     stringsAsFactors = FALSE
   )
   
-  # 6) Tür isimlerini satır ismi yapıp clade_name sütununu silelim.
+  # 7) Tür isimlerini satır ismi yapıp clade_name sütununu silelim.
   rownames(metaphlan_subset_wide_species) <- metaphlan_subset_wide_species$clade_name
   metaphlan_subset_wide_species$clade_name <- NULL
   
-  # 7) Data.frame → numeric matrix
+  # 8) Data.frame → numeric matrix
   metaphlan_subset_wide_species <- as.matrix(metaphlan_subset_wide_species)
   
-  # 8) NA'ları 0 yapalım. 
+  # 9) NA'ları 0 yapalım. 
   metaphlan_subset_wide_species[
     is.na(metaphlan_subset_wide_species)
   ] <- 0
   
-  # 9) Matrisi çağıralım.
+  # 10) Matrisi çağıralım.
   return(metaphlan_subset_wide_species)
 }
 
