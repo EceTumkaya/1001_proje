@@ -4,20 +4,53 @@ format: html
 editor: visual
 ---
 
+
 Öncelikle tüm paketleri kapsayan `tidyverse` paketini tanımlayıp çağırıyoruz.
 
 ```{r message=FALSE}
 library(tidyverse)
 ```
 
-# Aşağıdaki linklerden Metalog verisetlerini indiriyoruz.
 
-[metalog human long dataset indir](https://metalog.embl.de/static/download/metadata/human_all_long_latest.tsv.gz)
+Metalog verilerini internetten indirebilmek için `curl` paketini tanımlayıp çağırıyoruz.
 
-[metalog ocean long dataset indir](https://metalog.embl.de/static/download/metadata/ocean_all_long_latest.tsv.gz)
+```{r message = FALSE}
+library(curl)
 
-[metalog environment long dataset indir](https://metalog.embl.de/static/download/metadata/environmental_all_long_latest.tsv.gz)
+dir.create("data", showWarnings = FALSE)
+```
 
+
+Metalog verisetlerinin URL ve bilgisayarda kaydedilmesini istediğimiz klasöre kaydedilmesi için `links_metalog` ve `files_metalog` tanımladık.
+
+```{r}
+links_metalog <- c(
+  human = "https://metalog.embl.de/static/download/metadata/human_all_long_latest.tsv.gz",
+  ocean = "https://metalog.embl.de/static/download/metadata/ocean_all_long_latest.tsv.gz",
+  env   = "https://metalog.embl.de/static/download/metadata/environmental_all_long_latest.tsv.gz"
+)
+
+files_metalog <- c(
+  human = "data/human_all_long_2025-09-14.tsv.gz",
+  ocean = "data/ocean_all_long_2025-09-14.tsv.gz",
+  environment = "data/environmental_all_long_2025-09-14.tsv.gz")
+```
+
+
+Metalog verilerinin bilgisayarda yoksa indirilip, varsa bu işlemin atlanacağı bir for döngüsü oluşturuyotuz.
+
+```{r}
+for(k in names(links_metalog)) {
+  
+  if(!file.exists(files[k])) {
+    message("İndiriliyor: ", k)
+    curl_download(links_metalog[k], files_metalog[k])
+  }
+  else {
+    message("Zaten var, indirme atlandı: ", k)
+  }
+}
+```
 
 
 Metalogdan indirdiğimiz verisetlerini okuyoruz. Buradaki kodların asıl amacı: R, bazı sayı değerlerini başka şeylere çevirmesin; hepsi aynı şekilde kalsın diye tüm verileri metin olarak okumamız.
@@ -66,7 +99,7 @@ common_core
 ```
 
 
-Hepsinde yalnızca kendi grubunda bulunan, diğerlerinde bulunmayan metadata başlıklarını görmek istersek: (OPSİYONEL)
+Hepsinde yalnızca kendi grubunda bulunan, diğerlerinde bulunmayan metadata başlıklarını görmek istersek:
 
 ```{r eval = FALSE}
 human_metadata <- unique(human_core$metadata_item)
@@ -118,7 +151,7 @@ keep_cols <- c("domain_group", "sample_alias", "metadata_item", "curation_tier",
 
 Veri çerçevelerini birleştirmemiz için önce aynı sütun sayısına ve isimlerine sahip olmalılar. For döngüsü oluşturarak 3 ayrı kod yazmak yerine hepsini tek bir döngüye alabiliriz. Eğer sütun isimleri yukarıda tanımladığımız `keep_cols` ile aynı değilse: o sütunları hepsine birden ekleyip NA koyarız ki aynı olsunlar. Alttaki komutlar ile  oluşan tüm yeni veri setlerinde sadece `keep cols` u almaya yarıyor.
 
-```{r}
+```{r eval = FALSE}
 for (i in c("human_core_filter", "ocean_core_filter", "env_core_filter")) {
   df <- get(i)
   for (sutun in keep_cols) {
@@ -172,7 +205,7 @@ write.csv(master_wide, "master_common_core_wide.csv", row.names = FALSE)
 
 Artık harita oluşturmaya başlayacağız. Hangi örneklerin hangi konumda olduğunu göreceğiz. Öncelikle paketleri yükleyip çağıralım.  
 
-```{r message=false}
+```{r message = FALSE}
 library(tidyverse)
 library(sf)
 library(rnaturalearth)
@@ -183,7 +216,7 @@ library(rnaturalearthdata)
 
 `sf` paketi içinden dünya haritasını alacağız. `ne_countries` ülke sınırlarını getirir. `scale` harita ayrıntısını ifaede eder ve `returnclass` haritayı `sf` formatında çağırmamızı sağlar.
 
-```{r}
+```{r eval = FALSE}
 world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
 
 ```
@@ -209,7 +242,7 @@ df_map <- df_map |>
 
 Renksiz bir harita için kodlarımız:
 
-```{r}
+```{r eval = FALSE}
 p <- ggplot() +
 geom_sf(data = world, fill = "white", color = "grey50", linewidth = 0.4) +
 geom_point( data = df_map, aes(x = longitude, y = latitude, color = domain_group),
@@ -238,23 +271,32 @@ p <- ggplot() +
 ```
 
 
-Resim olarak kaydetmek için:
+Resim olarak kaydetmek için: (resim varsa atlanır, yoksa kaydedilir)
 
 ```{r}
-ggsave("my_map.png", p, width = 12, height = 6.5, dpi = 300)
+map_file <- "my_map.png"
+
+# Eğer dosya yoksa kaydet
+if (!file.exists(map_file)) {
+  message("Harita kaydediliyor...")
+  ggsave(map_file, p, width = 12, height = 6.5, dpi = 300)
+} else {
+  message("Harita zaten var, kaydetme atlandı.")
+}
+
 ```
 
 
 Metaphlan 4 verisetleri indirmek için öncelikle internetten dosya indirme paketi olan `curl` 'ü çağırıyoruz. Ardından `dir.create` komutunu kullanarak dosyaları içine kaydedeceğimiz `data` adlı klasörü açıyoruz. Eğer klasör zaten bilgisayarda varsa işlem yapılmaz.
 
-```{r}
+```{r message = FALSE}
 library(curl)
 
 dir.create("data", showWarnings = FALSE)
 ```
 
 
-Metaphlan 4 verisetlerinin URL ve bilgisayardaki kaydedilmesini istediğimiz klasöre kaydedilmesi için `links` ve `files` tanımladık.
+Metaphlan 4 verisetlerinin URL ve bilgisayarda kaydedilmesini istediğimiz klasöre kaydedilmesi için `links` ve `files` tanımladık.
 
 ```{r}
 links <- c(
@@ -297,9 +339,9 @@ metaphlan4_env <- read_tsv("environmental_metaphlan4_2025-10-26.tsv.gz", col_typ
 ```
 
 
-Rastgele satır seçebilmek için bir fonksiyon oluşturabiliriz.`slice_sample` komutu rastgele satır için, n= ise kaç satır çağırmak istediğimizi belirtmek için kullanılır.
+Rastgele satır seçebilmek için bir fonksiyon oluşturabiliriz.`slice_sample` komutu rastgele satır için, n = ise kaç satır çağırmak istediğimizi belirtmek için kullanılır.
 
-```{r}
+```{r eval = FALSE}
 pick_random_rows <- function(master_wide, n){
   master_wide |> slice_sample(n=n)
 }
