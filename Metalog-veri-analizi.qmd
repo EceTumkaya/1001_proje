@@ -299,11 +299,11 @@ for(k in names(links)) {
 Metalog veritabanından indirdiğimiz metaphlan 4 verilerini R' da okuyoruz.
 
 ```{r}
-metaphlan4_human <- read_tsv("human_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+metaphlan4_human <- read_tsv("data/human_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
 
-metaphlan4_ocean <- read_tsv("ocean_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+metaphlan4_ocean <- read_tsv("data/ocean_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
 
-metaphlan4_env <- read_tsv("environmental_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+metaphlan4_env <- read_tsv("data/environmental_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
 
 ```
 
