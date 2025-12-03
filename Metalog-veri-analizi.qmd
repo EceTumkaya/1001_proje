@@ -36,7 +36,7 @@ files_metalog <- c(
 Metalog verilerinin bilgisayarda yoksa indirilip, varsa bu işlemin atlanacağı bir for döngüsü oluşturuyotuz.
 
 ```{r}
-for(k in names(links_metalog)) {
+for(k in 1:length(links_metalog)) {
   
   if(!file.exists(files_metalog[k])) {
     message("İndiriliyor: ", k)
