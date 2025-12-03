@@ -51,11 +51,11 @@ for(k in 1:length(links_metalog)) {
 Metalogdan indirdiğimiz verisetlerini okuyoruz. Buradaki kodların asıl amacı: R, bazı sayı değerlerini başka şeylere çevirmesin; hepsi aynı şekilde kalsın diye tüm verileri metin olarak okumamız.
 
 ```{r}
-human <- read_tsv("human_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+human <- read_tsv("data/human_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
 
-ocean <- read_tsv("ocean_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+ocean <- read_tsv("data/ocean_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
 
-env <- read_tsv("environmental_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+env <- read_tsv("data/environmental_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
 
 ```
 
