@@ -405,3 +405,20 @@ make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
 }
 
 ```
+
+Testing the function:
+
+```{r}
+sample_data <- pick_random_rows(master_wide = master_wide, n = 10)
+```
+
+
+Get the matrix:
+
+```{r}
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = a$sample_alias)
+
+head(sample_metaphlan_matrix)
+```
+
+
