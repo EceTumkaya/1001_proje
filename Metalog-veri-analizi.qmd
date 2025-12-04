@@ -1,6 +1,10 @@
 ---
 title: "Metalog Verisi Analizi"
-format: html
+author: "Ece Tümkaya, Emrah Kırdök"
+format: 
+  html:
+    embed-resources: true
+
 editor: visual
 ---
 
@@ -309,7 +313,7 @@ metaphlan4_env <- read_tsv("data/environmental_metaphlan4_2025-10-26.tsv.gz", co
 
 Rastgele satır seçebilmek için bir fonksiyon oluşturabiliriz.`slice_sample` komutu rastgele satır için, n = ise kaç satır çağırmak istediğimizi belirtmek için kullanılır.
 
-```{r eval = FALSE}
+```{r}
 pick_random_rows <- function(master_wide, n){
   master_wide |> slice_sample(n=n)
 }
@@ -412,13 +416,10 @@ Testing the function:
 sample_data <- pick_random_rows(master_wide = master_wide, n = 10)
 ```
 
-
 Get the matrix:
 
 ```{r}
-sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = a$sample_alias)
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = sample_data$sample_alias)
 
 head(sample_metaphlan_matrix)
 ```
-
-
