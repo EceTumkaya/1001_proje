@@ -4,3 +4,7 @@
 .RData
 .Ruserdata
 data
+*files
+*html
+*png
+*csv
