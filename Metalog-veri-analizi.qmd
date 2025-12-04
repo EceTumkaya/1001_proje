@@ -413,7 +413,7 @@ make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
 Testing the function:
 
 ```{r}
-sample_data <- pick_random_rows(master_wide = master_wide, n = 10)
+sample_data <- pick_random_rows(master_wide = master_wide, n = 100)
 ```
 
 Get the matrix:
@@ -423,3 +423,27 @@ sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaph
 
 head(sample_metaphlan_matrix)
 ```
+
+## PCA için örnek kodlar
+
+```{r}
+#install.packages("vegan")
+library(vegan)
+# bray curtis uzaklik matrisi elde edildi
+bray_curtis_dist <- vegdist(x = t(sample_metaphlan_matrix), method = "bray")
+
+# pca yapildi
+pca <- prcomp(x = bray_curtis_dist)
+
+# pca icinde oz vektor (PC) verileri alindi ve pca data dataframe olusturuldu
+pca_data <- as.data.frame(pca$x)
+# orneklerin metadata bilgileri elde edildi
+sample_data_for_metaphlan <- as.data.frame(sample_data[sample_data$sample_alias %in% colnames(sample_metaphlan_matrix),])
+# pcadata dataframe icine domain group bilgisi eklendi
+pca_data$domain_group <- sample_data_for_metaphlan$domain_group
+
+# grafik olusturuldu
+library(ggplot2)
+ggplot(data=pca_data) + geom_point( aes(x=PC1, y=PC2, color=domain_group))
+```
+
