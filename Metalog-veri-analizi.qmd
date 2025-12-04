@@ -439,7 +439,7 @@ pca <- prcomp(x = bray_curtis_dist)
 pca_data <- as.data.frame(pca$x)
 # orneklerin metadata bilgileri elde edildi
 sample_data_for_metaphlan <- as.data.frame(sample_data[sample_data$sample_alias %in% colnames(sample_metaphlan_matrix),])
-# pcadata dataframe icine domain group bilgisi eklendi
+# pcadata dataframe icine domain group bilgisi 
 pca_data$domain_group <- sample_data_for_metaphlan$domain_group
 
 # grafik olusturuldu
