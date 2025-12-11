@@ -95,7 +95,7 @@ common_core
 
 Hepsinde yalnızca kendi grubunda bulunan, diğerlerinde bulunmayan metadata başlıklarını görmek istersek:
 
-```{r eval = FALSE}
+```{r}
 human_metadata <- unique(human_core$metadata_item)
 ocean_metadata <- unique(ocean_core$metadata_item)
 env_metadata <- unique(env_core$metadata_item)
@@ -140,7 +140,7 @@ keep_cols <- c("domain_group", "sample_alias", "metadata_item", "curation_tier",
 
 Veri çerçevelerini birleştirmemiz için önce aynı sütun sayısına ve isimlerine sahip olmalılar. For döngüsü oluşturarak 3 ayrı kod yazmak yerine hepsini tek bir döngüye alabiliriz. Eğer sütun isimleri yukarıda tanımladığımız `keep_cols` ile aynı değilse: o sütunları hepsine birden ekleyip NA koyarız ki aynı olsunlar. Alttaki komutlar ile oluşan tüm yeni veri setlerinde sadece `keep cols` u almaya yarıyor.
 
-```{r eval = FALSE}
+```{r}
 for (i in c("human_core_filter", "ocean_core_filter", "env_core_filter")) {
   df <- get(i)
   for (sutun in keep_cols) {
@@ -315,8 +315,9 @@ Rastgele satır seçebilmek için bir fonksiyon oluşturabiliriz.`slice_sample` 
 
 ```{r}
 pick_random_rows <- function(master_wide, n){
-  master_wide |> slice_sample(n=n)
+  master_wide[sample(nrow(master_wide), n), ]
 }
+
 ```
 
 Metaphlan veri setlerini `metaphlan_all` adı ile birleştiriyoruz. `rbind` komutu birleştirme işlemini yapar.
@@ -424,9 +425,10 @@ sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaph
 head(sample_metaphlan_matrix)
 ```
 
-## PCA için örnek kodlar
 
 ```{r}
+## PCA için örnek kodlar
+
 #install.packages("vegan")
 library(vegan)
 # bray curtis uzaklik matrisi elde edildi
@@ -447,5 +449,110 @@ pca_data$domain_group <- sample_data_for_metaphlan$domain_group
 # grafik olusturuldu
 library(ggplot2)
 ggplot(data=pca_data) + geom_point( aes(x=PC1, y=PC2, color=domain_group))
+```    
+
+`make_metaphlan_species_matrix` fonksiyonu ile oluşturduğumuz matris üzerinden, işlediğimiz örneklerin PCA analizini yapıp domain group' a sahip bir grafik oluşturuyoruz. (Emrah Hoca'nın yöntemi ile)
+
+
+```{r}
+sample_data <- pick_random_rows(master_wide = master_wide, n=100)
+
+sample_ids <- sample_data$sample_alias
 ```
+
+Çalıştırmak için:
+
+```{r}
+# Gerekli paketler
+library(vegan)
+library(ggplot2)
+
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(
+  metaphlan_all = metaphlan_all,
+  sample_ids    = sample_ids)
+
+sample_data <- unique(
+  master_wide[ ,c("sample_alias", "domain_group")])
+
+sample_data_for_metaphlan <- sample_data[sample_data$sample_alias %in% colnames(sample_metaphlan_matrix), ]
+
+# Sıralamayı matrisin sütun sırasına göre hizalamak için:
+sample_data_for_metaphlan <- sample_data_for_metaphlan[
+  match(colnames(sample_metaphlan_matrix),
+        sample_data_for_metaphlan$sample_alias), ]
+
+# Bray–Curtis uzaklık matrisi oluşturalım.
+bray_curtis_dist <- vegdist(
+  x      = t(sample_metaphlan_matrix),  # satırlar = örnekler
+  method = "bray")
+
+# PCA adımı
+pca <- prcomp( x = bray_curtis_dist)
+
+# PCA sonuçlarını tabloya çevirip domain ekleyelim.
+pca_df <- as.data.frame(pca$x)              # PC1, PC2, PC3...
+
+pca_df$sample_alias <- rownames(pca_df)   # hangi satır hangi örnek
+pca_df$domain_group <- sample_data_for_metaphlan$domain_group
+
+## 6) PCA grafiği oluşturalım.
+ggplot(data = pca_df) +
+  geom_point(
+    aes(x = PC1, y = PC2, color = domain_group),
+    size  = 2,
+    alpha = 0.8) +
+  labs(
+    x     = "PC1",
+    y     = "PC2",
+    color = "Domain",
+    title = "PCA")
+
+```
+
+`make_metaphlan_species_matrix` fonksiyonu ile oluşturduğumuz matris üzerinden, işlediğimiz örneklerin PCoA analizini yapıp, bir bray-curtis matrisi ve domain group' a sahip bir grafik oluşturuyoruz. (Sitedeki yönteme göre) (https://microbiome.github.io/course_2021_radboud/beta-diversity.html)
+
+```{r}
+library(vegan)
+library(ape)
+library(ggplot2)
+
+## 1) Bray–Curtis uzaklık matrisi oluşturalım.
+bray_dist <- vegdist(
+  x      = t(sample_metaphlan_matrix),
+  method = "bray")
+
+## 2) PCoA analizi
+pcoa_res <- ape::pcoa(bray_dist)
+
+## 3) PCoA sonuçlarını data.frame'e çevirelim.
+pcoa_df <- as.data.frame(pcoa_res$vectors[, 1:2])
+pcoa_df$sample_alias <- rownames(pcoa_df)
+
+## 4) Domain bilgisini ekleyelim.
+sample_data <- unique(master_long[, c("sample_alias", "domain_group")])
+
+pcoa_df <- merge(
+  x  = pcoa_df,
+  y  = sample_data,
+  by = "sample_alias",
+  all.x = TRUE)
+
+## 5) Eksenlerin açıkladığı varyansı yüzdelik olarak hazırlamak için:
+var_expl <- round(pcoa_res$values$Relative_eig[1:2] * 100, 1)
+
+## 6) PCoA grafiği
+ggplot(pcoa_df) +
+  geom_point(
+    aes(x = Axis.1, y = Axis.2, color = domain_group),
+    size  = 2,
+    alpha = 0.8) +
+  labs(
+    x     = paste0("PCoA1 (", var_expl[1], "%)"),
+    y     = paste0("PCoA2 (", var_expl[2], "%)"),
+    color = "Domain",
+    title = "Bray–Curtis + PCoA
+    ")
+
+```
+
 
