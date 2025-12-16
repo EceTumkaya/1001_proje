@@ -8,24 +8,25 @@ format:
 editor: visual
 ---
 
-dowload_data.R scriptinde hard diske kaydettiğimiz verileri bu kod ile çağırıyoruz.
+Başlangıçta analizlerimizi hazır veri üzerinden yapabilmek için dowload_data.R scriptinde hard diske kaydettiğimiz verileri çağırıyoruz.
 
 ```{r}
-master_long   <- readRDS("data/master_long.rds")
-master_wide   <- readRDS("data/master_wide.rds")
-metaphlan_all <- readRDS("data/metaphlan_all.rds")
+master_long   <- readRDS("data/metalog/processed/master_long.rds")
+master_wide   <- readRDS("data/metalog/processed/master_wide.rds")
+metaphlan_all <- readRDS("data/metaphlan/processed/metaphlan_all.rds")
 ```
 
-Artık harita oluşturmaya başlayacağız. Hangi örneklerin hangi konumda olduğunu göreceğiz. Öncelikle paketleri yükleyip çağıralım.
+Öncelikle analizler için gerekli paketleri yükleyip çağıralım.
 
 ```{r message = FALSE}
 library(tidyverse)
 library(sf)
 library(rnaturalearth)
 library(rnaturalearthdata)
+library(ggplot2)
 ```
 
-`sf` paketi içinden dünya haritasını alacağız. `ne_countries` ülke sınırlarını getirir. `scale` harita ayrıntısını ifaede eder ve `returnclass` haritayı `sf` formatında çağırmamızı sağlar.
+Örneklerimizin hangi konumlardan geldiğini görmek için bir harita oluşturmaya başlayacağız. `sf` paketi içinden dünya haritasını alıyoruz. `ne_countries` ülke sınırlarını getirir. `scale` harita ayrıntısını ifaede eder ve `returnclass` haritayı `sf` formatında çağırmamızı sağlar.
 
 ```{r eval = FALSE}
 world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
@@ -92,7 +93,7 @@ if (!file.exists(map_file)) {
 
 ```
 
-Rastgele satır seçebilmek için bir fonksiyon oluşturabiliriz.`slice_sample` komutu rastgele satır için, n = ise kaç satır çağırmak istediğimizi belirtmek için kullanılır.
+Rastgele satır seçebilmek için bir fonksiyon oluşturabiliriz. `n = ` ifadesi kaç satır çağırmak istediğimizi belirtmek için kullanılır.
 
 ```{r}
 pick_random_rows <- function(master_wide, n){
@@ -196,13 +197,11 @@ Get the matrix:
 
 ```{r}
 sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = sample_data$sample_alias)
-
-head(sample_metaphlan_matrix)
 ```
 
 PCA yardımcı, örnek kodlar:
 
-```{r}
+```{r eval = FALSE}
 ## PCA için örnek kodlar
 
 #install.packages("vegan")
@@ -227,7 +226,7 @@ library(ggplot2)
 ggplot(data=pca_data) + geom_point( aes(x=PC1, y=PC2, color=domain_group))
 ```    
 
-Çalıştırmak için:
+PCA ve PCoA analizleri kodlarını çalıştırmak için:
 
 ```{r}
 sample_data <- pick_random_rows(master_wide = master_wide, n=100)
