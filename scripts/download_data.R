@@ -2,10 +2,17 @@
 # Ece Tumkaya
 
 
+#Başlangıçta klasörlerimizi oluşturuyoruz.
+dir.create("data", showWarnings = FALSE)
+dir.create("data/metalog/raw", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/metaphlan/raw", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/metaphlan/processed", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/metalog/processed", recursive = TRUE, showWarnings = FALSE)
+
+
 #Öncelikleri gerekli paketleri çağırıyoruz.
 library(curl)
 library(tidyverse)
-dir.create("data", showWarnings = FALSE)
 
 
 #Metalog verisetlerinin URL ve bilgisayarda kaydedilmesini istediğimiz klasöre kaydedilmesi için `links_metalog` ve `files_metalog` tanımladık.
@@ -15,9 +22,9 @@ links_metalog <- c(
   env   = "https://metalog.embl.de/static/download/metadata/environmental_all_long_latest.tsv.gz")
 
 files_metalog <- c(
-  human = "data/human_all_long_2025-09-14.tsv.gz",
-  ocean = "data/ocean_all_long_2025-09-14.tsv.gz",
-  environment = "data/environmental_all_long_2025-09-14.tsv.gz")
+  human = "data/metalog/raw/human_all_long_latest.tsv.gz",
+  ocean = "data/metalog/raw/ocean_all_long_latest.tsv.gz",
+  environment   = "data/metalog/raw/environmental_all_long_latest.tsv.gz")
 
 
 #Metalog verilerinin bilgisayarda yoksa indirilip, varsa bu işlemin atlanacağı bir for döngüsü oluşturuyoruz.
@@ -34,9 +41,10 @@ for(k in 1:length(links_metalog)) {
 
 
 #Metalogdan indirdiğimiz verisetlerini okuyoruz. Buradaki kodların asıl amacı: R, bazı sayı değerlerini başka şeylere çevirmesin; hepsi aynı şekilde kalsın diye tüm verileri metin olarak okumamız.
-human <- read_tsv("data/human_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
-ocean <- read_tsv("data/ocean_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
-env <- read_tsv("data/environmental_all_long_2025-09-14.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+human <- read_tsv(files_metalog["human"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+ocean <- read_tsv(files_metalog["ocean"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+env <- read_tsv(files_metalog["environment"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+
 
 
 #Veri setlerindeki `curation_tier` değeri `core` yani elzem olanları listelemeliyiz. 
@@ -85,27 +93,27 @@ master_wide <- spread(data = master_long, key = "metadata_item", value = "value"
 
 
 #Oluşturduğumuz tabloyu kaydediyoruz.
-write.csv(master_wide, "master_common_core_wide.csv", row.names = FALSE)
+write.csv(master_wide, "data/metalog/processed/master_common_core_wide.csv", row.names = FALSE)
 
 
 #Metaphlan 4 verisetlerinin URL ve bilgisayarda kaydedilmesini istediğimiz klasöre kaydedilmesi için `links` ve `files` tanımladık.
-links <- c(
+links_metaphlan <- c(
   human = "https://metalog.embl.de/static/download/profiles/human_metaphlan4_latest.tsv.gz",
   ocean = "https://metalog.embl.de/static/download/profiles/ocean_metaphlan4_latest.tsv.gz",
   environment = "https://metalog.embl.de/static/download/profiles/environmental_metaphlan4_latest.tsv.gz")
 
-files <- c(
-  human = "data/human_metaphlan4_2025-10-26.tsv.gz",
-  ocean = "data/ocean_metaphlan4_2025-10-26.tsv.gz",
-  environment = "data/environmental_metaphlan4_2025-10-26.tsv.gz")
+files_metaphlan <- c(
+  human = "data/metaphlan/raw/human_metaphlan4_2025-10-26.tsv.gz",
+  ocean = "data/metaphlan/raw/ocean_metaphlan4_2025-10-26.tsv.gz",
+  environment = "data/metaphlan/raw/environmental_metaphlan4_2025-10-26.tsv.gz")
 
 
 #Metaphlan 4 verilerinin bilgisayarda yoksa indirilip, varsa bu işlemin atlanacağı bir for döngüsü oluşturuyotuz.
-for(k in names(links)) {
+for(k in names(links_metaphlan)) {
   
-  if(!file.exists(files[k])) {
+  if(!file.exists(files_metaphlan[k])) {
     message("İndiriliyor: ", k)
-    curl_download(links[k], files[k])
+    curl_download(links_metaphlan[k], files_metaphlan[k])
   }
   else {
     message("Zaten var, indirme atlandı: ", k)
@@ -113,9 +121,9 @@ for(k in names(links)) {
 }
 
 #Metalog veritabanından indirdiğimiz metaphlan 4 verilerini R' da okuyoruz.
-metaphlan4_human <- read_tsv("data/human_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
-metaphlan4_ocean <- read_tsv("data/ocean_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
-metaphlan4_env <- read_tsv("data/environmental_metaphlan4_2025-10-26.tsv.gz", col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+metaphlan4_human <- read_tsv(files_metaphlan["human"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+metaphlan4_ocean <- read_tsv(files_metaphlan["ocean"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+metaphlan4_env <- read_tsv(files_metaphlan["environment"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
 
 
 #Metaphlan veri setlerini `metaphlan_all` adı ile birleştiriyoruz. `rbind` komutu birleştirme işlemini yapar.
@@ -123,6 +131,7 @@ metaphlan_all <- rbind(metaphlan4_human, metaphlan4_ocean, metaphlan4_env)
 
 
 #Analizlerde kullanacağımız büyük verileri tekrar tekrar indirmemek için diske kaydediyoruz:
-saveRDS(master_long, "data/master_long.rds")
-saveRDS(master_wide, "data/master_wide.rds")
-saveRDS(metaphlan_all, "data/metaphlan_all.rds")
+saveRDS(master_long, "data/metalog/processed/master_long.rds")
+saveRDS(master_wide, "data/metalog/processed/master_wide.rds")
+saveRDS(metaphlan_all, "data/metaphlan/processed/metaphlan_all.rds")
+
