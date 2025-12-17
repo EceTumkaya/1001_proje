@@ -153,7 +153,11 @@ make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
   # rel_abund karakter geldiyse sayıya çevirelim. (ileride numeric matrix için)
   metaphlan_subset_long_species$rel_abund <- as.numeric(
     metaphlan_subset_long_species$rel_abund
-  )
+    )
+  
+  # Aynı (sample_alias, clade_name) birden fazla kez gelmişse rel_abund'ları topla
+metaphlan_subset_long_species <- aggregate(rel_abund ~ sample_alias + clade_name,
+   data = metaphlan_subset_long_species, FUN  = sum)
   
   # 5) Long → Wide çevirelim.
   metaphlan_subset_wide_species <- spread(
@@ -190,7 +194,7 @@ make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
 Testing the function:
 
 ```{r}
-sample_data <- pick_random_rows(master_wide = master_wide, n = 100)
+sample_data <- pick_random_rows(master_wide = master_wide, n = 300)
 ```
 
 Get the matrix:
@@ -229,7 +233,7 @@ ggplot(data=pca_data) + geom_point( aes(x=PC1, y=PC2, color=domain_group))
 PCA ve PCoA analizleri kodlarını çalıştırmak için:
 
 ```{r}
-sample_data <- pick_random_rows(master_wide = master_wide, n=100)
+sample_data <- pick_random_rows(master_wide = master_wide, n=1000)
 
 sample_ids <- sample_data$sample_alias
 ```
