@@ -156,8 +156,7 @@ make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
     )
   
   # Aynı (sample_alias, clade_name) birden fazla kez gelmişse rel_abund'ları topla
-metaphlan_subset_long_species <- aggregate(rel_abund ~ sample_alias + clade_name,
-   data = metaphlan_subset_long_species, FUN  = sum)
+metaphlan_subset_long_species <- aggregate(rel_abund ~ sample_alias + clade_name,   data = metaphlan_subset_long_species, FUN  = sum)
   
   # 5) Long → Wide çevirelim.
   metaphlan_subset_wide_species <- spread(
@@ -233,7 +232,7 @@ ggplot(data=pca_data) + geom_point( aes(x=PC1, y=PC2, color=domain_group))
 PCA ve PCoA analizleri kodlarını çalıştırmak için:
 
 ```{r}
-sample_data <- pick_random_rows(master_wide = master_wide, n=1000)
+sample_data <- pick_random_rows(master_wide = master_wide, n=1500)
 
 sample_ids <- sample_data$sample_alias
 ```
@@ -332,3 +331,35 @@ ggplot(pcoa_df) +
     ")
 
 ```
+
+
+
+```{r}
+library(VennDiagram)
+
+# 1) master long'dan sample_alias – domain_group sütunlarını alıp tabloyu küçültüyoruz.
+sample_domain <- unique(master_long[, c("sample_alias", "domain_group")])
+
+# 2) metaphlan_all üzerine domain_group ekliyoruz.
+df <- metaphlan_all
+df$domain_group <- sample_domain$domain_group[
+  match(df$sample_alias, sample_domain$sample_alias)]
+
+# 3) Sadece species düzeyini alıyoruz.
+df <- df[grepl("s__", df$clade_name), ]
+
+# 4) rel_abund numeric + > 0 olanlar (rel abund değeri olanları filtreliyoruz.)
+df$rel_abund <- as.numeric(df$rel_abund)
+df <- df[!is.na(df$rel_abund) & df$rel_abund > 0, ]
+
+# 5) Ortama göre mikrop listelerini filtreliyoruz.
+human_microbes <- unique(gsub(".*s__", "", df$clade_name[df$domain_group == "human"]))
+ocean_microbes <- unique(gsub(".*s__", "", df$clade_name[df$domain_group == "ocean"]))
+env_microbes   <- unique(gsub(".*s__", "", df$clade_name[df$domain_group == "env"]))
+
+# 6) Venn diyagramı
+venn.diagram(
+  x = list(Human = human_microbes, Ocean = ocean_microbes, Environment = env_microbes),
+  filename = "venn_microbes_all.png")
+```
+
