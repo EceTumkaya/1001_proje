@@ -363,3 +363,38 @@ venn.diagram(
   filename = "venn_microbes_all.png")
 ```
 
+NMDS analizi için önce bu kodu çalıştırıyoruz.
+
+```{r}
+sample_data <- pick_random_rows(master_wide = master_wide, n = 300)
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = sample_data$sample_alias)
+```
+
+NMDS analizi ile örnekler arasındaki benzerlik ve farklılıkları görselleştireceğiz.
+
+```{r}
+library(vegan)
+library(ggplot2)
+
+
+rm(profile)  # (gerekmez ama kafayı rahatlatır)
+
+# 1) Mikrobiyal matrisimiz:
+profile_mat <- sample_metaphlan_matrix
+
+# 2) Matrisi numeric yapıyoruz ki analiz gerçekleşebilsin.
+profile_mat <- as.matrix(profile_mat)
+mode(profile_mat) <- "numeric"
+
+# 3) NMDS 
+k <- 3
+nmds <- metaMDS(t(profile_mat), k = k)
+
+# 4) Skorları alıp görselleştiriyoruz.
+data.scores <- as.data.frame(scores(nmds, display = "sites"))
+
+ggplot(data.scores) +
+  geom_point(aes(NMDS1, NMDS2), alpha = 0.2, size = 2)
+```
+
+
