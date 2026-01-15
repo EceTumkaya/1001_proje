@@ -376,9 +376,6 @@ NMDS analizi ile örnekler arasındaki benzerlik ve farklılıkları görselleş
 library(vegan)
 library(ggplot2)
 
-
-rm(profile)  # (gerekmez ama kafayı rahatlatır)
-
 # 1) Mikrobiyal matrisimiz:
 profile_mat <- sample_metaphlan_matrix
 
@@ -390,11 +387,19 @@ mode(profile_mat) <- "numeric"
 k <- 3
 nmds <- metaMDS(t(profile_mat), k = k)
 
-# 4) Skorları alıp görselleştiriyoruz.
+# 4) Skorları alıyoruz.
 data.scores <- as.data.frame(scores(nmds, display = "sites"))
 
+# 5) Domain bilgisini ekliyoruz ki renklendirebilelim.
+data.scores$sample_alias <- rownames(data.scores)
+sample_domain <- unique(master_long[, c("sample_alias", "domain_group")])
+data.scores$domain_group <- sample_domain$domain_group[
+  match(data.scores$sample_alias, sample_domain$sample_alias)]
+
+# 6) Grafik ile görselleştiriyoruz. 
 ggplot(data.scores) +
-  geom_point(aes(NMDS1, NMDS2), alpha = 0.2, size = 2)
+  geom_point(aes(NMDS1, NMDS2, color = domain_group), alpha = 0.2, size = 2) +
+  labs(color = "Domain", title = "NMDS (metaphlan species matrix)") 
 ```
 
 
