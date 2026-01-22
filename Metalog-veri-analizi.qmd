@@ -560,4 +560,20 @@ data.scores$domain_group <- sample_domain$domain_group[match(data.scores$sample_
 nmds_plot <- ggplot(data.scores) +
   geom_point(aes(NMDS1, NMDS3, color = domain_group), alpha = 0.2, size = 2) +
   labs(color = "Domain", title = "NMDS (metaphlan species matrix)")
+```
 
+Bray-curtis uzaklık matrisi üzerinden `domain group` değişkeninin mikrobiyal kompozisyonu anlamlı şekilde ayırıp ayırmadığını inceliyoruz.
+
+```{r}
+meta <- data.frame(
+  domain_group = sample_data_for_metaphlan$domain_group,
+  row.names    = sample_data_for_metaphlan$sample_alias)
+
+# 1) Filtresiz
+bray_adonis_unfilter <- vegdist(t(sample_metaphlan_matrix), method = "bray")
+adonis2(bray_adonis_unfilter ~ domain_group, data = meta)
+
+# 2) Filtreli
+bray_adonis_filter <- vegdist(t(mat_prev), method = "bray")
+adonis2(bray_adonis_filter ~ domain_group, data = meta)
+```
