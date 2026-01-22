@@ -439,5 +439,125 @@ mat_prev <- mat_prev[, colSums(mat_prev > 0) > 0, drop = FALSE]
 mat_prev <- mat_prev[rowSums(mat_prev > 0) > 0, , drop = FALSE]
 ```
 
+Girdiyi pseudocount kullandığımız; filtreli ve filtresiz matrisler olarak değiştirdiğimiz pca kodu:
 
+```{r}
+library(vegan)
+library(ggplot2)
+
+sample_metaphlan_matrix <- sample_metaphlan_matrix_pc
+
+sample_data <- unique(
+  master_wide[ ,c("sample_alias", "domain_group")])
+
+sample_data_for_metaphlan <- sample_data[sample_data$sample_alias %in% colnames(sample_metaphlan_matrix), ]
+
+# Sıralamayı matrisin sütun sırasına göre hizalamak için:
+sample_data_for_metaphlan <- sample_data_for_metaphlan[
+  match(colnames(sample_metaphlan_matrix),
+        sample_data_for_metaphlan$sample_alias), ]
+
+# Bray–Curtis uzaklık matrisi oluşturalım.
+bray_curtis_dist <- vegdist(
+  x      = t(sample_metaphlan_matrix),  # satırlar = örnekler
+  method = "bray")
+
+# PCA adımı
+pca <- prcomp( x = bray_curtis_dist)
+
+# PCA sonuçlarını tabloya çevirip domain ekleyelim.
+pca_df <- as.data.frame(pca$x)              # PC1, PC2, PC3...
+
+pca_df$sample_alias <- rownames(pca_df)   # hangi satır hangi örnek
+pca_df$domain_group <- sample_data_for_metaphlan$domain_group
+
+## 6) PCA grafiği oluşturalım.
+pca_plot <- ggplot(data = pca_df) +
+  geom_point(
+    aes(x = PC1, y = PC2, color = domain_group),
+    size  = 2,
+    alpha = 0.8) +
+  labs(
+    x     = "PC1",
+    y     = "PC2",
+    color = "Domain",
+    title = "PCA")
+
+```
+
+Girdiyi filtreli ve filtresiz matrisler olarak değiştirdiğimiz pcoa kodu:
+
+```{r}
+library(vegan)
+library(ape)
+library(ggplot2)
+
+## 1) Bray–Curtis uzaklık matrisi oluşturalım.
+bray_dist <- vegdist(
+  x      = t(sample_metaphlan_matrix),
+  method = "bray")
+
+## 2) PCoA analizi
+pcoa_res <- ape::pcoa(bray_dist)
+
+## 3) PCoA sonuçlarını data.frame'e çevirelim.
+pcoa_df <- as.data.frame(pcoa_res$vectors[, 1:2])
+pcoa_df$sample_alias <- rownames(pcoa_df)
+
+## 4) Domain bilgisini ekleyelim.
+sample_data <- unique(master_long[, c("sample_alias", "domain_group")])
+
+pcoa_df <- merge(
+  x  = pcoa_df,
+  y  = sample_data,
+  by = "sample_alias",
+  all.x = TRUE)
+
+## 5) Eksenlerin açıkladığı varyansı yüzdelik olarak hazırlamak için:
+var_expl <- round(pcoa_res$values$Relative_eig[1:2] * 100, 1)
+
+## 6) PCoA grafiği
+pcoa_plot <- ggplot(pcoa_df) +
+  geom_point(
+    aes(x = Axis.1, y = Axis.2, color = domain_group),
+    size  = 2,
+    alpha = 0.8) +
+  labs(
+    x     = paste0("PCoA1 (", var_expl[1], "%)"),
+    y     = paste0("PCoA2 (", var_expl[2], "%)"),
+    color = "Domain",
+    title = "Bray–Curtis + PCoA
+    ")
+
+```
+
+Girdiyi filtreli ve filtresiz matrisler olarak değiştirdiğimiz nmds kodu:
+
+```{r}
+library(vegan)
+library(ggplot2)
+
+# 1) Mikrobiyal matrisimiz:
+profile_mat <- mat_prev
+
+# 2) Matrisi numeric yapıyoruz ki analiz gerçekleşebilsin.
+profile_mat <- as.matrix(profile_mat)
+#mode(profile_mat) <- "numeric"
+
+# 3) NMDS 
+k <- 3
+nmds <- metaMDS(t(profile_mat), k = k)
+
+# 4) Skorları alıyoruz.
+data.scores <- as.data.frame(scores(nmds, display = "sites"))
+
+# 5) Domain bilgisini ekliyoruz ki renklendirebilelim.
+data.scores$sample_alias <- rownames(data.scores)
+sample_domain <- unique(master_long[, c("sample_alias", "domain_group")])
+data.scores$domain_group <- sample_domain$domain_group[match(data.scores$sample_alias, sample_domain$sample_alias)]
+
+# 6) Grafik ile görselleştiriyoruz. 
+nmds_plot <- ggplot(data.scores) +
+  geom_point(aes(NMDS1, NMDS3, color = domain_group), alpha = 0.2, size = 2) +
+  labs(color = "Domain", title = "NMDS (metaphlan species matrix)")
 
