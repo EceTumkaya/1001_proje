@@ -366,7 +366,9 @@ venn.diagram(
 NMDS analizi için önce bu kodu çalıştırıyoruz.
 
 ```{r}
-sample_data <- pick_random_rows(master_wide = master_wide, n = 300)
+set.seed(100)
+sample_data <- pick_random_rows(master_wide = master_wide, n = 1000)
+sample_ids <- sample_data$sample_alias
 sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = sample_data$sample_alias)
 ```
 
@@ -381,10 +383,10 @@ profile_mat <- sample_metaphlan_matrix
 
 # 2) Matrisi numeric yapıyoruz ki analiz gerçekleşebilsin.
 profile_mat <- as.matrix(profile_mat)
-mode(profile_mat) <- "numeric"
+#mode(profile_mat) <- "numeric"
 
 # 3) NMDS 
-k <- 3
+k <- 6
 nmds <- metaMDS(t(profile_mat), k = k)
 
 # 4) Skorları alıyoruz.
@@ -393,13 +395,49 @@ data.scores <- as.data.frame(scores(nmds, display = "sites"))
 # 5) Domain bilgisini ekliyoruz ki renklendirebilelim.
 data.scores$sample_alias <- rownames(data.scores)
 sample_domain <- unique(master_long[, c("sample_alias", "domain_group")])
-data.scores$domain_group <- sample_domain$domain_group[
-  match(data.scores$sample_alias, sample_domain$sample_alias)]
+data.scores$domain_group <- sample_domain$domain_group[match(data.scores$sample_alias, sample_domain$sample_alias)]
 
 # 6) Grafik ile görselleştiriyoruz. 
 ggplot(data.scores) +
-  geom_point(aes(NMDS1, NMDS2, color = domain_group), alpha = 0.2, size = 2) +
+  geom_point(aes(NMDS1, NMDS3, color = domain_group), alpha = 0.2, size = 2) +
   labs(color = "Domain", title = "NMDS (metaphlan species matrix)") 
+
 ```
+Matrisleri filtreleyerek ve filtrelemeden analizleri yapıp sonuçların farklılığını inceleyeceğiz. Aşağıdaki chunk içinde başlangıç matrisi bulunuyor.
+
+```{r}
+set.seed(100)
+sample_data <- pick_random_rows(master_wide = master_wide, n = 1000)
+sample_ids <- sample_data$sample_alias
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = sample_data$sample_alias)
+```
+
+Filtreleme işleminden önce verilerin daha rahat işlenmesi için pseudocount ekliyoruz.
+
+```{r}
+pseudo <- 1e-6
+sample_metaphlan_matrix_pc <- sample_metaphlan_matrix + pseudo
+```
+
+Filtrede çok az tür bulunan düşük sinyalli örnekleri ve çok az örnekte bulunan türleri atıyoruz. Filtreleme işlemi:
+
+```{r}
+# 0) Matris temizliği
+mat <- as.matrix(sample_metaphlan_matrix)
+mode(mat) <- "numeric"
+mat[is.na(mat)] <- 0
+
+# 1) Prevalence filtresi (tür bazında)
+prev_threshold <- 0.05
+prev <- rowMeans(mat > 0)
+mat_prev <- mat[prev >= prev_threshold, , drop = FALSE]
+
+# 2) Boş örnekleri at (örnek bazında)
+mat_prev <- mat_prev[, colSums(mat_prev > 0) > 0, drop = FALSE]
+
+# (isteğe bağlı ekstra güvenlik) tamamen boş kalan türleri at
+mat_prev <- mat_prev[rowSums(mat_prev > 0) > 0, , drop = FALSE]
+```
+
 
 
