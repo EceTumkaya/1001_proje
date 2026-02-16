@@ -84,8 +84,8 @@ master_long <- rbind(human_core_filter[,keep_cols],
                                  env_core_filter[,keep_cols])
 
 #Satırlarda aynı bilgi birden fazla kez tekrarlanmış mı kontrol ediyoruz. sonuç 0 olmalı.
-dup_mask <- duplicated(master_long[, c("domain_group","sample_alias","metadata_item")])
-sum(dup_mask)
+#dup_mask <- duplicated(master_long[, c("domain_group","sample_alias","metadata_item")])
+#sum(dup_mask)
 
 
 #`master_long` dosyasını, `master_wide` adı ile geniş formata çevirdik. `metadata_item` esas alınır.
@@ -134,4 +134,8 @@ metaphlan_all <- rbind(metaphlan4_human, metaphlan4_ocean, metaphlan4_env)
 saveRDS(master_long, "data/metalog/processed/master_long.rds")
 saveRDS(master_wide, "data/metalog/processed/master_wide.rds")
 saveRDS(metaphlan_all, "data/metaphlan/processed/metaphlan_all.rds")
+
+
+ancient_host <- readr::read_tsv("data/ancient/ancientmetagenome-hostassociated_samples.tsv")
+ancient_env <- readr::read_tsv("data/ancient/ancientmetagenome-environmental_samples.tsv")
 

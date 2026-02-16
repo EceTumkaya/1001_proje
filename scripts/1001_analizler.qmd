@@ -1,0 +1,622 @@
+---
+title: "Metalog Verisi Analizi"
+author: "Ece Tümkaya, Emrah Kırdök"
+format: 
+  html:
+    embed-resources: true
+
+editor: visual
+---
+
+Başlangıçta analizlerimizi hazır veri üzerinden yapabilmek için dowload_data.R scriptinde harddiske kaydettiğimiz verileri çağırıyoruz.
+
+```{r}
+master_long   <- readRDS("data/metalog/processed/master_long.rds")
+master_wide   <- readRDS("data/metalog/processed/master_wide.rds")
+metaphlan_all <- readRDS("data/metaphlan/processed/metaphlan_all.rds")
+```
+
+Öncelikle analizler için gerekli paketleri yükleyip çağıralım.
+
+```{r message = FALSE}
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(ggplot2)
+```
+
+Örneklerimizin hangi konumlardan geldiğini görmek için bir harita oluşturmaya başlayacağız. `sf` paketi içinden dünya haritasını alıyoruz. `ne_countries` ülke sınırlarını getirir. `scale` harita ayrıntısını ifaede eder ve `returnclass` haritayı `sf` formatında çağırmamızı sağlar.
+
+```{r eval = FALSE}
+world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+```
+
+Aynı işlemi :: komutu kullanmadan da yapabiliriz. Bu komut `library` kullanmadan fonksiyonu o paketin içinden çağırmayı sağlar. Ancak biz `library` kullandığımızdan aşağıdaki kod daha kolay anlaşılır oluyor.
+
+```{r}
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+```
+
+Haritayı şu şekilde oluşturuyoruz: önce enlem ve boylamı numaraya çeviriyoruz. Sonra `sub` komutu ile metin içindeki desenler değişir: ,'ler .'lara çevrilir (R tarafından metin olarak algılanmasın diye). Enlem ve boylamlarımızda boşluklar varsa atılır. En sonunda ise tüm dünyayı kapsayıcı enlem ve boylamlarımızı gireriz.
+
+```{r}
+df_map <- master_wide
+df_map <- df_map |>
+  filter(!is.na(latitude), !is.na(longitude)) 
+
+```
+
+Renksiz bir harita için kodlarımız:
+
+```{r eval = FALSE}
+p <- ggplot() +
+geom_sf(data = world, fill = "white", color = "grey50", linewidth = 0.4) +
+geom_point( data = df_map, aes(x = longitude, y = latitude, color = domain_group),
+alpha = 0.6, size = 1.0) +
+coord_sf(lims_method = "geometry_bbox", default_crs = NULL) +
+labs(x = "Longitude", y = "Latitude", color = "Domain") +
+theme_minimal()
+
+```
+
+Renklendirmek için gelişmiş: öncelikle temel bir harita çektik. Ardından `df_map` yani `master_wide` kullanarak kendi örneklerimizi nokta grafiğinde gösterdik. X ekseni enlem, y ekseni boylam oldu. Arka planı ise son kod ile mavi yapıp kenar çizgilerini kaldırdık.
+
+```{r}
+p <- ggplot() +
+  geom_sf(data = world, fill = "#cfead6", color = "grey60", linewidth = 0.25) + 
+  geom_point(data = df_map,
+             aes(x = longitude, y = latitude, color = domain_group),
+             shape = 16, size = 0.9, alpha = 0.35) +
+  coord_sf(lims_method = "geometry_bbox", default_crs = NULL) + 
+  labs(x = "Longitude", y = "Latitude", color = "Domain") + 
+  theme_minimal(base_size = 11) + 
+  theme(legend.position = "bottom", 
+        panel.background = element_rect(fill = "#d8eafd", color = NA))
+
+```
+
+Resim olarak kaydetmek için: (resim varsa atlanır, yoksa kaydedilir)
+
+```{r}
+map_file <- "my_map.png"
+
+# Eğer dosya yoksa kaydet
+if (!file.exists(map_file)) {
+  message("Harita kaydediliyor...")
+  ggsave(map_file, p, width = 12, height = 6.5, dpi = 300)
+} else {
+  message("Harita zaten var, kaydetme atlandı.")
+}
+
+```
+
+Rastgele satır seçebilmek için bir fonksiyon oluşturabiliriz. `n =` ifadesi kaç satır çağırmak istediğimizi belirtmek için kullanılır.
+
+```{r}
+pick_random_rows <- function(master_wide, n){
+  master_wide[sample(nrow(master_wide), n), ]
+}
+
+```
+
+Kullanılacak örnekleri `sample_ids` adıyla tanımlayıp `metaphlan_all` içinde var olanlarla ortak olanları alıyoruz. Seçili örneklerle yeni bir tablo oluşturuyoruz. Tablomuzu önce data frame, sonra matrise dönüştürüyoruz. Yeni matriste Na yerine 0 koyuyoruz.
+
+```{r}
+make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
+  
+  # 1) Gerekli sütunlar var mı kontrol edelim.
+  needed_cols <- c("sample_alias", "clade_name", "rel_abund")
+  missing <- setdiff(needed_cols, colnames(metaphlan_all))
+  if (length(missing) > 0) {
+    stop(paste(
+      "metaphlan_all içinde eksik sütun(lar) var:",
+      paste(missing, collapse = ", ")
+    ))
+  }
+  
+  # 2) sample_ids gerçekten metaphlan_all içinde var mı kontrol edelim.
+  common_ids <- intersect(sample_ids, metaphlan_all$sample_alias)
+  if (length(common_ids) == 0) {
+    stop("Verdiğin sample_ids, metaphlan_all içinde bulunamadı.")
+  }
+  
+  if (length(common_ids) < length(sample_ids)) {
+    warning("Bazı sample_ids Metaphlan verisinde yok, sadece bulunanlar kullanılacak.")
+  }
+  
+  # 3) Metaphlan long tablosundan sadece bu örnekleri alalım.
+  metaphlan_subset_long <- metaphlan_all[
+    metaphlan_all$sample_alias %in% common_ids,
+    ,
+    drop = FALSE
+  ]
+  # metaphlan_subset_long: seçilen örneklere ait long satırlar
+  
+  # 4) Sadece species ('s__') düzeyini alıp önünden 's__''i kaldıralım. 
+  metaphlan_subset_long_species <- metaphlan_subset_long[
+    grepl("s__", metaphlan_subset_long$clade_name),
+    ,
+    drop = FALSE
+  ]
+  # grepl("s__") → clade_name içinde tür düzeyi (s__) geçen satırlar
+
+  metaphlan_subset_long_species$clade_name <- gsub(
+    "s__",
+    "",
+    metaphlan_subset_long_species$clade_name
+  )
+  # gsub("s__", "") → clade_name içindeki s__ önekini silmek için.
+  
+  # rel_abund karakter geldiyse sayıya çevirelim. (ileride numeric matrix için)
+  metaphlan_subset_long_species$rel_abund <- as.numeric(
+    metaphlan_subset_long_species$rel_abund
+    )
+  
+  # Aynı (sample_alias, clade_name) birden fazla kez gelmişse rel_abund'ları topla
+metaphlan_subset_long_species <- aggregate(rel_abund ~ sample_alias + clade_name,   data = metaphlan_subset_long_species, FUN  = sum)
+  
+  # 5) Long → Wide çevirelim.
+  metaphlan_subset_wide_species <- spread(
+    data  = metaphlan_subset_long_species,
+    key   = "sample_alias",   
+    value = "rel_abund"       
+  )
+  # metaphlan_subset_wide_species: satırlar = türler, sütunlar = seçilen örnekler
+  
+  # 6) Tibble ise klasik data.frame'e çevirelim. 
+  metaphlan_subset_wide_species <- as.data.frame(
+    metaphlan_subset_wide_species,
+    stringsAsFactors = FALSE
+  )
+  
+  # 7) Tür isimlerini satır ismi yapıp clade_name sütununu silelim.
+  rownames(metaphlan_subset_wide_species) <- metaphlan_subset_wide_species$clade_name
+  metaphlan_subset_wide_species$clade_name <- NULL
+  
+  # 8) Data.frame → numeric matrix
+  metaphlan_subset_wide_species <- as.matrix(metaphlan_subset_wide_species)
+  
+  # 9) NA'ları 0 yapalım. 
+  metaphlan_subset_wide_species[
+    is.na(metaphlan_subset_wide_species)
+  ] <- 0
+  
+  # 10) Matrisi çağıralım.
+  return(metaphlan_subset_wide_species)
+}
+
+```
+
+Testing the function:
+
+```{r}
+sample_data <- pick_random_rows(master_wide = master_wide, n = 300)
+```
+
+Get the matrix:
+
+```{r}
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = sample_data$sample_alias)
+```
+
+PCA yardımcı, örnek kodlar:
+
+```{r eval = FALSE}
+## PCA için örnek kodlar
+
+#install.packages("vegan")
+library(vegan)
+# bray curtis uzaklik matrisi elde edildi
+bray_curtis_dist <- vegdist(x = t(sample_metaphlan_matrix), method = "bray")
+
+# pca yapildi
+pca <- prcomp(x = bray_curtis_dist)
+
+# pca icinde oz vektor (PC) verileri alindi ve pca data dataframe olusturuldu
+pca_data <- as.data.frame(pca$x)
+# orneklerin metadata bilgileri elde edildi
+sample_data_for_metaphlan <- as.data.frame(sample_data[sample_data$sample_alias %in% colnames(sample_metaphlan_matrix),])
+
+# pcadata dataframe icine domain group bilgisi eklenmis oldu
+
+pca_data$domain_group <- sample_data_for_metaphlan$domain_group
+
+# grafik olusturuldu
+library(ggplot2)
+ggplot(data=pca_data) + geom_point( aes(x=PC1, y=PC2, color=domain_group))
+```
+
+PCA ve PCoA analizleri kodlarını çalıştırmak için:
+
+```{r}
+sample_data <- pick_random_rows(master_wide = master_wide, n=1500)
+
+sample_ids <- sample_data$sample_alias
+```
+
+`make_metaphlan_species_matrix` fonksiyonu ile oluşturduğumuz matris üzerinden, işlediğimiz örneklerin PCA analizini yapıp domain group' a sahip bir grafik oluşturuyoruz. (Emrah Hoca'nın yöntemi ile)
+
+```{r}
+# Gerekli paketler
+library(vegan)
+library(ggplot2)
+
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(
+  metaphlan_all = metaphlan_all,
+  sample_ids    = sample_ids)
+
+sample_data <- unique(
+  master_wide[ ,c("sample_alias", "domain_group")])
+
+sample_data_for_metaphlan <- sample_data[sample_data$sample_alias %in% colnames(sample_metaphlan_matrix), ]
+
+# Sıralamayı matrisin sütun sırasına göre hizalamak için:
+sample_data_for_metaphlan <- sample_data_for_metaphlan[
+  match(colnames(sample_metaphlan_matrix),
+        sample_data_for_metaphlan$sample_alias), ]
+
+# Bray–Curtis uzaklık matrisi oluşturalım.
+bray_curtis_dist <- vegdist(
+  x      = t(sample_metaphlan_matrix),  # satırlar = örnekler
+  method = "bray")
+
+# PCA adımı
+pca <- prcomp( x = bray_curtis_dist)
+
+# PCA sonuçlarını tabloya çevirip domain ekleyelim.
+pca_df <- as.data.frame(pca$x)              # PC1, PC2, PC3...
+
+pca_df$sample_alias <- rownames(pca_df)   # hangi satır hangi örnek
+pca_df$domain_group <- sample_data_for_metaphlan$domain_group
+
+## 6) PCA grafiği oluşturalım.
+ggplot(data = pca_df) +
+  geom_point(
+    aes(x = PC1, y = PC2, color = domain_group),
+    size  = 2,
+    alpha = 0.8) +
+  labs(
+    x     = "PC1",
+    y     = "PC2",
+    color = "Domain",
+    title = "PCA")
+
+```
+
+`make_metaphlan_species_matrix` fonksiyonu ile oluşturduğumuz matris üzerinden, işlediğimiz örneklerin PCoA analizini yapıp, bir bray-curtis matrisi ve domain group' a sahip bir grafik oluşturuyoruz. (Sitedeki yönteme göre) (https://microbiome.github.io/course_2021_radboud/beta-diversity.html)
+
+```{r}
+library(vegan)
+library(ape)
+library(ggplot2)
+
+## 1) Bray–Curtis uzaklık matrisi oluşturalım.
+bray_dist <- vegdist(
+  x      = t(sample_metaphlan_matrix),
+  method = "bray")
+
+## 2) PCoA analizi
+pcoa_res <- ape::pcoa(bray_dist)
+
+## 3) PCoA sonuçlarını data.frame'e çevirelim.
+pcoa_df <- as.data.frame(pcoa_res$vectors[, 1:2])
+pcoa_df$sample_alias <- rownames(pcoa_df)
+
+## 4) Domain bilgisini ekleyelim.
+sample_data <- unique(master_long[, c("sample_alias", "domain_group")])
+
+pcoa_df <- merge(
+  x  = pcoa_df,
+  y  = sample_data,
+  by = "sample_alias",
+  all.x = TRUE)
+
+## 5) Eksenlerin açıkladığı varyansı yüzdelik olarak hazırlamak için:
+var_expl <- round(pcoa_res$values$Relative_eig[1:2] * 100, 1)
+
+## 6) PCoA grafiği
+ggplot(pcoa_df) +
+  geom_point(
+    aes(x = Axis.1, y = Axis.2, color = domain_group),
+    size  = 2,
+    alpha = 0.8) +
+  labs(
+    x     = paste0("PCoA1 (", var_expl[1], "%)"),
+    y     = paste0("PCoA2 (", var_expl[2], "%)"),
+    color = "Domain",
+    title = "Bray–Curtis + PCoA
+    ")
+
+```
+
+```{r}
+library(VennDiagram)
+
+# 1) master long'dan sample_alias – domain_group sütunlarını alıp tabloyu küçültüyoruz.
+sample_domain <- unique(master_long[, c("sample_alias", "domain_group")])
+
+# 2) metaphlan_all üzerine domain_group ekliyoruz.
+df <- metaphlan_all
+df$domain_group <- sample_domain$domain_group[
+  match(df$sample_alias, sample_domain$sample_alias)]
+
+# 3) Sadece species düzeyini alıyoruz.
+df <- df[grepl("s__", df$clade_name), ]
+
+# 4) rel_abund numeric + > 0 olanlar (rel abund değeri olanları filtreliyoruz.)
+df$rel_abund <- as.numeric(df$rel_abund)
+df <- df[!is.na(df$rel_abund) & df$rel_abund > 0, ]
+
+# 5) Ortama göre mikrop listelerini filtreliyoruz.
+human_microbes <- unique(gsub(".*s__", "", df$clade_name[df$domain_group == "human"]))
+ocean_microbes <- unique(gsub(".*s__", "", df$clade_name[df$domain_group == "ocean"]))
+env_microbes   <- unique(gsub(".*s__", "", df$clade_name[df$domain_group == "env"]))
+
+# 6) Venn diyagramı
+venn.diagram(
+  x = list(Human = human_microbes, Ocean = ocean_microbes, Environment = env_microbes),
+  filename = "venn_microbes_all.png")
+```
+
+NMDS analizi için önce bu kodu çalıştırıyoruz.
+
+```{r}
+set.seed(100)
+sample_data <- pick_random_rows(master_wide = master_wide, n = 1000)
+sample_ids <- sample_data$sample_alias
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = sample_data$sample_alias)
+```
+
+NMDS analizi ile örnekler arasındaki benzerlik ve farklılıkları görselleştireceğiz.
+
+```{r}
+library(vegan)
+library(ggplot2)
+
+# 1) Mikrobiyal matrisimiz:
+profile_mat <- sample_metaphlan_matrix
+
+# 2) Matrisi numeric yapıyoruz ki analiz gerçekleşebilsin.
+profile_mat <- as.matrix(profile_mat)
+#mode(profile_mat) <- "numeric"
+
+# 3) NMDS 
+k <- 6
+nmds <- metaMDS(t(profile_mat), k = k)
+
+# 4) Skorları alıyoruz.
+data.scores <- as.data.frame(scores(nmds, display = "sites"))
+
+# 5) Domain bilgisini ekliyoruz ki renklendirebilelim.
+data.scores$sample_alias <- rownames(data.scores)
+sample_domain <- unique(master_long[, c("sample_alias", "domain_group")])
+data.scores$domain_group <- sample_domain$domain_group[match(data.scores$sample_alias, sample_domain$sample_alias)]
+
+# 6) Grafik ile görselleştiriyoruz. 
+ggplot(data.scores) +
+  geom_point(aes(NMDS1, NMDS3, color = domain_group), alpha = 0.2, size = 2) +
+  labs(color = "Domain", title = "NMDS (metaphlan species matrix)") 
+
+```
+
+Matrisleri filtreleyerek ve filtrelemeden analizleri yapıp sonuçların farklılığını inceleyeceğiz. Aşağıdaki chunk içinde başlangıç matrisi bulunuyor.
+
+```{r}
+set.seed(100)
+sample_data <- pick_random_rows(master_wide = master_wide, n = 1000)
+sample_ids <- sample_data$sample_alias
+sample_metaphlan_matrix <- make_metaphlan_species_matrix(metaphlan_all =  metaphlan_all, sample_ids = sample_data$sample_alias)
+```
+
+Filtreleme işleminden önce verilerin daha rahat işlenmesi için pseudocount ekliyoruz.
+
+```{r}
+pseudo <- 1e-6
+sample_metaphlan_matrix_pc <- sample_metaphlan_matrix + pseudo
+```
+
+Filtrede çok az tür bulunan düşük sinyalli örnekleri ve çok az örnekte bulunan türleri atıyoruz. Filtreleme işlemi:
+
+```{r}
+# 0) Matris temizliği
+mat <- as.matrix(sample_metaphlan_matrix)
+mode(mat) <- "numeric"
+mat[is.na(mat)] <- 0
+
+# 1) Prevalence filtresi (tür bazında)
+prev_threshold <- 0.05
+prev <- rowMeans(mat > 0)
+mat_prev <- mat[prev >= prev_threshold, , drop = FALSE]
+
+# 2) Boş örnekleri at (örnek bazında)
+mat_prev <- mat_prev[, colSums(mat_prev > 0) > 0, drop = FALSE]
+
+# (isteğe bağlı ekstra güvenlik) tamamen boş kalan türleri at
+mat_prev <- mat_prev[rowSums(mat_prev > 0) > 0, , drop = FALSE]
+```
+
+Girdiyi pseudocount kullandığımız; filtreli ve filtresiz matrisler olarak değiştirdiğimiz pca kodu:
+
+```{r}
+library(vegan)
+library(ggplot2)
+
+sample_metaphlan_matrix <- sample_metaphlan_matrix_pc
+
+sample_data <- unique(
+  master_wide[ ,c("sample_alias", "domain_group")])
+
+sample_data_for_metaphlan <- sample_data[sample_data$sample_alias %in% colnames(sample_metaphlan_matrix), ]
+
+# Sıralamayı matrisin sütun sırasına göre hizalamak için:
+sample_data_for_metaphlan <- sample_data_for_metaphlan[
+  match(colnames(sample_metaphlan_matrix),
+        sample_data_for_metaphlan$sample_alias), ]
+
+# Bray–Curtis uzaklık matrisi oluşturalım.
+bray_curtis_dist <- vegdist(
+  x      = t(sample_metaphlan_matrix),  # satırlar = örnekler
+  method = "bray")
+
+# PCA adımı
+pca <- prcomp( x = bray_curtis_dist)
+
+# PCA sonuçlarını tabloya çevirip domain ekleyelim.
+pca_df <- as.data.frame(pca$x)              # PC1, PC2, PC3...
+
+pca_df$sample_alias <- rownames(pca_df)   # hangi satır hangi örnek
+pca_df$domain_group <- sample_data_for_metaphlan$domain_group
+
+## 6) PCA grafiği oluşturalım.
+pca_plot <- ggplot(data = pca_df) +
+  geom_point(
+    aes(x = PC1, y = PC2, color = domain_group),
+    size  = 2,
+    alpha = 0.8) +
+  labs(
+    x     = "PC1",
+    y     = "PC2",
+    color = "Domain",
+    title = "PCA")
+
+```
+
+Girdiyi filtreli ve filtresiz matrisler olarak değiştirdiğimiz pcoa kodu:
+
+```{r}
+library(vegan)
+library(ape)
+library(ggplot2)
+
+## 1) Bray–Curtis uzaklık matrisi oluşturalım.
+bray_dist <- vegdist(
+  x      = t(sample_metaphlan_matrix),
+  method = "bray")
+
+## 2) PCoA analizi
+pcoa_res <- ape::pcoa(bray_dist)
+
+## 3) PCoA sonuçlarını data.frame'e çevirelim.
+pcoa_df <- as.data.frame(pcoa_res$vectors[, 1:2])
+pcoa_df$sample_alias <- rownames(pcoa_df)
+
+## 4) Domain bilgisini ekleyelim.
+sample_data <- unique(master_long[, c("sample_alias", "domain_group")])
+
+pcoa_df <- merge(
+  x  = pcoa_df,
+  y  = sample_data,
+  by = "sample_alias",
+  all.x = TRUE)
+
+## 5) Eksenlerin açıkladığı varyansı yüzdelik olarak hazırlamak için:
+var_expl <- round(pcoa_res$values$Relative_eig[1:2] * 100, 1)
+
+## 6) PCoA grafiği
+pcoa_plot <- ggplot(pcoa_df) +
+  geom_point(
+    aes(x = Axis.1, y = Axis.2, color = domain_group),
+    size  = 2,
+    alpha = 0.8) +
+  labs(
+    x     = paste0("PCoA1 (", var_expl[1], "%)"),
+    y     = paste0("PCoA2 (", var_expl[2], "%)"),
+    color = "Domain",
+    title = "Bray–Curtis + PCoA
+    ")
+
+```
+
+Girdiyi filtreli ve filtresiz matrisler olarak değiştirdiğimiz nmds kodu:
+
+```{r}
+library(vegan)
+library(ggplot2)
+
+# 1) Mikrobiyal matrisimiz:
+profile_mat <- mat_prev
+
+# 2) Matrisi numeric yapıyoruz ki analiz gerçekleşebilsin.
+profile_mat <- as.matrix(profile_mat)
+#mode(profile_mat) <- "numeric"
+
+# 3) NMDS 
+k <- 3
+nmds <- metaMDS(t(profile_mat), k = k)
+
+# 4) Skorları alıyoruz.
+data.scores <- as.data.frame(scores(nmds, display = "sites"))
+
+# 5) Domain bilgisini ekliyoruz ki renklendirebilelim.
+data.scores$sample_alias <- rownames(data.scores)
+sample_domain <- unique(master_long[, c("sample_alias", "domain_group")])
+data.scores$domain_group <- sample_domain$domain_group[match(data.scores$sample_alias, sample_domain$sample_alias)]
+
+# 6) Grafik ile görselleştiriyoruz. 
+nmds_plot <- ggplot(data.scores) +
+  geom_point(aes(NMDS1, NMDS3, color = domain_group), alpha = 0.2, size = 2) +
+  labs(color = "Domain", title = "NMDS (metaphlan species matrix)")
+```
+
+Bray-curtis uzaklık matrisi üzerinden `domain group` değişkeninin mikrobiyal kompozisyonu anlamlı şekilde ayırıp ayırmadığını inceliyoruz (adonis uygulaması).
+
+```{r}
+meta <- data.frame(
+  domain_group = sample_data_for_metaphlan$domain_group,
+  row.names    = sample_data_for_metaphlan$sample_alias)
+
+# 1) Filtresiz
+bray_adonis_unfilter <- vegdist(t(sample_metaphlan_matrix), method = "bray")
+adonis2(bray_adonis_unfilter ~ domain_group, data = meta)
+
+# 2) Filtreli
+bray_adonis_filter <- vegdist(t(mat_prev), method = "bray")
+adonis2(bray_adonis_filter ~ domain_group, data = meta)
+```
+
+ancientmetagenomedir sayfasından aldığımız `ancient_env` ve `ancient_host` örneklerini; modern örnek metadata tablosu olan `master_wide` içindeki örnekler ile eşleştirip, ortak olanları birleştiriyoruz.
+
+```{r}
+library(dplyr)
+library(readr)
+# 1) antik çevre ve canlı örneklerini birleştiriyoruz:
+ancient_raw <- bind_rows(ancient_env, ancient_host)
+
+# 2) Excel'de belirlenen rename map:
+rename_map <- c(
+  "publication_doi"      = "doi",
+  "geo_loc_name"         = "geographic_location",
+  "sampling_date"        = "collection_date",
+  "project_name"         = "study_code",
+  "sample_name"          = "sample_alias",
+  "site_name"            = "location")
+
+# 3) Antik veriyi master wide yapısına yaklaştıralım
+ancient_ready <- ancient_raw %>% rename(any_of(rename_map))
+
+# 4) Master wide'da olup antik tabloda olmayan sütunları NA'ya çevirelim.
+missing_cols <- setdiff(colnames(master_wide), colnames(ancient_ready)) 
+ancient_ready[missing_cols] <- NA
+
+# 5) Sütun sırasını birebir master wide ile aynı hale getirelim.
+ancient_ready <- ancient_ready %>% select(all_of(colnames(master_wide)))
+
+# 6) master wide ile ancient ready içindeki enlem - boylam sütunlarının formatları farklı olduğundan 
+# (num/chr) eşitliyoruz.
+master_wide <- master_wide %>% 
+  mutate(latitude  = as.numeric(latitude),
+         longitude = as.numeric(longitude))
+
+ancient_ready <- ancient_ready %>% 
+  mutate(latitude  = as.numeric(latitude),
+         longitude = as.numeric(longitude))
+
+# 6) Modern ve  antik tabloları birleştiriyoruz:
+combined_master_wide <- bind_rows(master_wide, ancient_ready)
+
+# 7) Kaydetmek için:
+write_tsv(combined_master_wide, "data/combined_master_wide.tsv")
+```
