@@ -2,11 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
-data
-*files
-*html
-*.csv
-.RDataTmp*
-*.RData
-*.RData.tmp
-*.tmp
+data/*
+*Rproj
+png/*
+*RData*
