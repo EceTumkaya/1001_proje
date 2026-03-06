@@ -1,3 +1,5 @@
+library(tidyverse)
+
 #Veri setlerindeki `curation_tier` değeri `core` yani elzem olanları listelemeliyiz. 
 #Bunun nedeni: önemli sayılan `metadata_item` verileri, yüksek ihtimalle insan, okyanus ve çevre örneklerinde ortak olacaktır. 
 #Hem elzem başlıkları öğreneceğiz hem de hepsinde ortak olan `metadata_item`lerı çıkarmamız kolaylaşacak. Her veri seti için sadece `core` filtresi yaparsak:
