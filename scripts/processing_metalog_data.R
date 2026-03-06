@@ -1,5 +1,21 @@
 library(tidyverse)
 
+#Metalog verisetlerinin URL ve bilgisayarda kaydedilmesini istediğimiz klasöre kaydedilmesi için `links_metalog` ve `files_metalog` tanımladık.
+links_metalog <- c(
+  human = "https://metalog.embl.de/static/download/metadata/human_all_long_latest.tsv.gz",
+  ocean = "https://metalog.embl.de/static/download/metadata/ocean_all_long_latest.tsv.gz",
+  env   = "https://metalog.embl.de/static/download/metadata/environmental_all_long_latest.tsv.gz")
+
+files_metalog <- c(
+  human = "data/metalog/raw/human_all_long_latest.tsv.gz",
+  ocean = "data/metalog/raw/ocean_all_long_latest.tsv.gz",
+  environment   = "data/metalog/raw/environmental_all_long_latest.tsv.gz")
+
+#Metalogdan indirdiğimiz verisetlerini okuyoruz. Buradaki kodların asıl amacı: R, bazı sayı değerlerini başka şeylere çevirmesin; hepsi aynı şekilde kalsın diye tüm verileri metin olarak okumamız.
+human <- read_tsv(files_metalog["human"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+ocean <- read_tsv(files_metalog["ocean"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+env <- read_tsv(files_metalog["environment"], col_types = cols(.default = "c"), na = c("", "NA"), locale = locale(encoding = "UTF-8"))
+
 #Veri setlerindeki `curation_tier` değeri `core` yani elzem olanları listelemeliyiz. 
 #Bunun nedeni: önemli sayılan `metadata_item` verileri, yüksek ihtimalle insan, okyanus ve çevre örneklerinde ortak olacaktır. 
 #Hem elzem başlıkları öğreneceğiz hem de hepsinde ortak olan `metadata_item`lerı çıkarmamız kolaylaşacak. Her veri seti için sadece `core` filtresi yaparsak:
