@@ -2,7 +2,13 @@
 
 library(vegan)
 library(ggplot2)
-library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(tibble)
+library(stringr)
+library(purrr)
+library(forcats)
 
 make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
   
