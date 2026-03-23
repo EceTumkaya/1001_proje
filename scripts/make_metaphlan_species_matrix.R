@@ -1,3 +1,6 @@
+library(dplyr)
+library(tidyr)
+
 make_metaphlan_species_matrix <- function(metaphlan_all, sample_ids) {
   
   # 1) Gerekli sütunlar var mı kontrol edelim.
