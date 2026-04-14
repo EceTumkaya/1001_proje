@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 ancient_host içinden sadece insan türüne ait filtreleme yaparak başlıyoruz. Ardından master_table içinde kullanmak istediğimiz sütunları seçiyoruz. Source 1 ve 2 de sabit veriler olan ancient ve human atamasını yapıp en sonunda birleştirme işleminde tüm sütunların ortak olması için isimlendirme yapıyoruz.
 
 ```{r}
@@ -28,6 +29,26 @@ ancient_host_table <- ancient_host_table[, c("sample_name", "Source1", "Source2"
 
 # sütun adlarını ortak tablo yapısına göre değiştiriyoruz
 colnames(ancient_host_table) <- c("SampleID", "Source1", "Source2", "Source3", "Source4", "DOI")
+
+ancient_host_metadata <- ancient_host_human %>%
+  transmute(
+    SampleID = sample_name,
+    Source1 = "ancient",
+    Source2 = "human",
+    Source3 = community_type,
+    Source4 = material,
+    longitude = longitude,
+    latitude = latitude,
+    geographic_location = geo_loc_name,
+    collection_date = NA,
+    study_code = project_name,
+    site_name = site_name,
+    sample_age = sample_age
+  )
+
+ancient_host_metadata$longitude <- as.numeric(ancient_host_metadata$longitude)
+ancient_host_metadata$latitude  <- as.numeric(ancient_host_metadata$latitude)
+ancient_host_metadata$collection_date  <- as.character(ancient_host_metadata$collection_date)
 ```
 
 master_table içinde kullanmak istediğimiz sütunları seçiyoruz. Source 1 ve 2 de sabit veriler olan ancient ve environmental atamasını yapıp en sonunda birleştirme işleminde tüm sütunların ortak olması için isimlendirme yapıyoruz.
@@ -38,13 +59,33 @@ ancient_env_table <- ancient_env[, c("sample_name", "material", "feature", "publ
 
 # Source1 ve Source2 sütunlarını ekliyoruz
 ancient_env_table$Source1 <- "ancient"
-ancient_env_table$Source2 <- "environmental"
+ancient_env_table$Source2 <- "env"
 
 # sütun sırasını düzenliyoruz
 ancient_env_table <- ancient_env_table[, c("sample_name", "Source1", "Source2", "material", "feature", "publication_doi")]
 
 # sütun adlarını ortak tablo yapısına göre değiştiriyoruz
 colnames(ancient_env_table) <- c("SampleID", "Source1", "Source2", "Source3", "Source4", "DOI")
+
+ancient_env_metadata <- ancient_env %>%
+  transmute(
+    SampleID = sample_name,
+    Source1 = "ancient",
+    Source2 = "environmental",
+    Source3 = material,
+    Source4 = feature,
+    longitude = longitude,
+    latitude = latitude,
+    geographic_location = geo_loc_name,
+    collection_date = sampling_date,
+    study_code = project_name,
+    site_name = site_name,
+    sample_age = sample_age
+  )
+
+ancient_env_metadata$longitude <- as.numeric(ancient_env_metadata$longitude)
+ancient_env_metadata$latitude  <- as.numeric(ancient_env_metadata$latitude)
+ancient_env_metadata$collection_date  <- as.character(ancient_env_metadata$collection_date)
 ```
 
 Benzer işlemleri modern örneklerimizi barındıran master wide veri seti için de yapıyoruz. 
@@ -62,6 +103,26 @@ modern_table <- modern_table[, c("sample_alias", "Source1", "domain_group", "env
 
 # sütun adlarını ortak tablo yapısına göre değiştiriyoruz
 colnames(modern_table) <- c("SampleID", "Source1", "Source2", "Source3", "Source4", "DOI")
+
+modern_metadata <- master_wide %>%
+  transmute(
+    SampleID = sample_alias,
+    Source1 = "modern",
+    Source2 = domain_group,
+    Source3 = environmental_package,
+    Source4 = environment_material,
+    longitude = longitude,
+    latitude = latitude,
+    geographic_location = geographic_location,
+    collection_date = collection_date,
+    study_code = study_code,
+    site_name = NA_character_,
+    sample_age = 0
+  )
+
+modern_metadata$longitude <- as.numeric(modern_metadata$longitude)
+modern_metadata$latitude  <- as.numeric(modern_metadata$latitude)
+modern_metadata$collection_date  <- as.character(modern_metadata$collection_date)
 ```
 
 Belirlediğimiz kriterlere göre hazırlanmış tabloları master_table adıyla birleştiriyouz.
@@ -71,5 +132,26 @@ master_table <- rbind(
   ancient_host_table,
   ancient_env_table,
   modern_table)
+
+# 3) metadata tablolarını birleştir
+master_metadata_table <- bind_rows(
+  modern_metadata,
+  ancient_host_metadata,
+  ancient_env_metadata
+)
+
+# 4) master_table ile birleştir
+#    Aynı sütun gelmesin diye
+#    Source ve SampleID üzerinden join yapıyoruz
+# -----------------------------
+master_table_final <- master_table %>%
+  left_join(
+    master_metadata_table,
+    by = c("SampleID", "Source1", "Source2", "Source3", "Source4")
+  )
+```
+```{r}
+dir.create("outputs", showWarnings = FALSE)
+write.table(master_table_final, "outputs/master_table_final.tsv", sep = "\t", row.names = FALSE)
 ```
 
