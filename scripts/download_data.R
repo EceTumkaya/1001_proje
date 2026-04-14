@@ -8,6 +8,8 @@ dir.create("data/metalog/raw", recursive = TRUE, showWarnings = FALSE)
 dir.create("data/metaphlan/raw", recursive = TRUE, showWarnings = FALSE)
 dir.create("data/metaphlan/processed", recursive = TRUE, showWarnings = FALSE)
 dir.create("data/metalog/processed", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/ancient/Samples", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/ancient/Libraries", recursive = TRUE, showWarnings = FALSE)
 
 
 #Öncelikleri gerekli paketleri çağırıyoruz.
@@ -108,7 +110,7 @@ files_metaphlan <- c(
   environment = "data/metaphlan/raw/environmental_metaphlan4_2025-10-26.tsv.gz")
 
 
-#Metaphlan 4 verilerinin bilgisayarda yoksa indirilip, varsa bu işlemin atlanacağı bir for döngüsü oluşturuyotuz.
+#Metaphlan 4 verilerinin bilgisayarda yoksa indirilip, varsa bu işlemin atlanacağı bir for döngüsü oluşturuyoruz.
 for(k in names(links_metaphlan)) {
   
   if(!file.exists(files_metaphlan[k])) {
@@ -136,6 +138,26 @@ saveRDS(master_wide, "data/metalog/processed/master_wide.rds")
 saveRDS(metaphlan_all, "data/metaphlan/processed/metaphlan_all.rds")
 
 
-ancient_host <- readr::read_tsv("data/ancient/ancientmetagenome-hostassociated_samples.tsv")
-ancient_env <- readr::read_tsv("data/ancient/ancientmetagenome-environmental_samples.tsv")
+#ancient verisetlerinin URL ve bilgisayarda kaydedilmesini istediğimiz klasöre kaydedilmesi için `links_ancient` ve `files_ancient` tanımladık.
+links_ancient <- c(
+  host = "https://raw.githubusercontent.com/SPAAM-community/AncientMetagenomeDir/refs/heads/master/ancientmetagenome-hostassociated/samples/ancientmetagenome-hostassociated_samples.tsv",
+  environment = "https://raw.githubusercontent.com/SPAAM-community/AncientMetagenomeDir/refs/heads/master/ancientmetagenome-environmental/samples/ancientmetagenome-environmental_samples.tsv")
 
+files_ancient <- c(
+  host = "data/ancient/Samples/ancientmetagenome-hostassociated_samples.tsv",
+  environment = "data/ancient/Samples/ancientmetagenome-environmental_samples.tsv")
+
+
+#ancient verilerinin bilgisayarda yoksa indirilip, varsa bu işlemin atlanacağı bir for döngüsü oluşturuyoruz.
+for (k in names(links_ancient)) {
+  if (!file.exists(files_ancient[k])) {
+    message("İndiriliyor: ", k)
+    curl::curl_download(links_ancient[k], files_ancient[k])
+  } else {
+    message("Zaten var, indirme atlandı: ", k)
+  }
+}
+
+# Kaydettiğimiz verileri okuyoruz.
+ancient_host <- read.table(files_ancient["host"], sep = "\t", header = TRUE, fill = TRUE, quote = "", comment.char = "", stringsAsFactors = FALSE)
+ancient_env <- read.table(files_ancient["environment"], sep = "\t", header = TRUE, fill = TRUE, quote = "", comment.char = "", stringsAsFactors = FALSE)
