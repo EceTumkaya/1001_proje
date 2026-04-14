@@ -1,0 +1,98 @@
+---
+title: "master_table_final_metadata_analysis"
+author: "Ece"
+date: "2026-04-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE}
+master_table_final <- read.table("outputs/master_table_final.tsv", sep = "\t", header = TRUE)
+```
+
+```{r echo=FALSE}
+tab_source1 <- table(master_table_final$Source1)
+tab_source2 <- table(master_table_final$Source2)
+tab_source3 <- table(master_table_final$Source3)
+tab_source4 <- table(master_table_final$Source4)
+
+tab_source1_df <- as.data.frame(tab_source1)
+tab_source2_df <- as.data.frame(tab_source2)
+tab_source3_df <- as.data.frame(tab_source3)
+tab_source4_df <- as.data.frame(tab_source4)
+```
+
+```{r echo=FALSE}
+tab_source1_2 <- table(master_table_final$Source1, master_table_final$Source2)
+tab_source1_3 <- table(master_table_final$Source1, master_table_final$Source3)
+tab_source1_4 <- table(master_table_final$Source1, master_table_final$Source4)
+tab_source2_3 <- table(master_table_final$Source2, master_table_final$Source3)
+
+tab_source1_2_df <- as.data.frame(tab_source1_2)
+tab_source1_3_df <- as.data.frame(tab_source1_3)
+tab_source1_4_df <- as.data.frame(tab_source1_4)
+tab_source2_3_df <- as.data.frame(tab_source2_3)
+```
+
+## Elimizde kaç antik, kaç modern örnek var?
+
+```{r}
+colnames(tab_source1_df) <- c("Kategori", "Sayi")
+tab_source1_df
+
+```
+
+## Elimizde her domaine ait kaç örnek var?
+
+```{r}
+colnames(tab_source2_df) <- c("Kategori", "Sayi")
+tab_source2_df
+
+```
+
+## Elimizde domain alt gruplarına ait kaç örnek var?
+
+```{r}
+colnames(tab_source3_df) <- c("Kategori", "Sayi")
+tab_source3_df
+```
+
+## Elimizde en alt gruplar için kaç örnek var?
+
+```{r}
+colnames(tab_source4_df) <- c("Kategori", "Sayi")
+tab_source4_df
+
+```
+
+## Her domain için örneklerin kaçı antik, kaçı modern?
+
+```{r}
+colnames(tab_source1_2_df) <- c("Kategori1", "Kategori2", "Sayi")
+tab_source1_2_df
+```
+
+## Domain alt gruplarındaki örneklerin kaçı antik, kaçı modern?
+
+```{r}
+colnames(tab_source1_3_df) <- c("Kategori1", "Kategori2", "Sayi")
+tab_source1_3_df
+```
+
+## En alt gruptaki örneklerden kaçı antik, kaçı modern?
+
+```{r}
+colnames(tab_source1_4_df) <- c("Kategori1", "Kategori2", "Sayi")
+tab_source1_4_df
+```
+
+## Hangi domainin kaç tane domain alt grup örneği var?
+
+```{r}
+colnames(tab_source2_3_df) <- c("Kategori1", "Kategori2", "Sayi")
+tab_source2_3_df
+```
+
